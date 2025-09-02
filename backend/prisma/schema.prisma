@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model DaySchedule {
+  id        Int            @id @default(autoincrement())
+  date      DateTime       @unique
+  title     String?
+  notes     String?
+  items     ScheduleItem[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model ScheduleItem {
+  id         Int         @id @default(autoincrement())
+  schedule   DaySchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  scheduleId Int
+  title      String
+  emoji      String?
+  color      String?     @default("#FFD1DC")
+  startTime  DateTime
+  endTime    DateTime?
+  location   String?
+  kind       ItemKind    @default(GENERAL)
+  departurePlace String?
+  arrivalPlace   String?
+  notes      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([scheduleId, startTime])
+}
+
+enum ItemKind {
+  GENERAL
+  MOVE
+}

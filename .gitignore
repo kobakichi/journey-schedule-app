@@ -1,0 +1,51 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node.js
+node_modules/
+**/node_modules/
+
+# Builds / Bundles
+dist/
+**/dist/
+build/
+**/build/
+.cache/
+**/.cache/
+.vite/
+**/.vite/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Tests / Coverage
+coverage/
+.nyc_output/
+
+# Environment variables
+.env
+**/.env
+.env.*
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Docker (local override)
+docker-compose.override.yml
+
+# Prisma (SQLite artifacts if ever used)
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
