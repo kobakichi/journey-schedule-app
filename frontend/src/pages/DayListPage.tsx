@@ -4,6 +4,7 @@ import { createItem, DaySchedule, deleteItem, fetchDay, toDateInput, toTimeInput
 import { durationMinutes, formatDuration } from '../time';
 import BottomNav from '../components/BottomNav';
 import { getTheme, setTheme, type Theme } from '../theme';
+import AuthButton from '../components/AuthButton';
 import { addDays } from '../date';
 
 type NewItemState = { startTime: string; endTime: string; departurePlace: string; arrivalPlace: string; notes: string; };
@@ -49,9 +50,12 @@ export default function DayListPage(){
     <div className="container" style={{ paddingBottom: 80 }}>
       <header className="header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <span className="brand">旅のしおり</span>
-        <button className="ghost" onClick={onToggleTheme} aria-label={`テーマ: ${themeLabel}`} title={`テーマ: ${themeLabel}`}>
-          {theme === 'auto' ? '自動' : theme === 'light' ? 'ライト' : 'ダーク'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="ghost" onClick={onToggleTheme} aria-label={`テーマ: ${themeLabel}`} title={`テーマ: ${themeLabel}`}>
+            {theme === 'auto' ? '自動' : theme === 'light' ? 'ライト' : 'ダーク'}
+          </button>
+          <AuthButton onAuth={() => { /* stay */ }} />
+        </div>
       </header>
       <section className="card" style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -129,7 +133,7 @@ function ListItemContent({ item, date, durationLabel, onSaved, onDelete }: { ite
   if(!editing){ const isMove=(item.kind||'general')==='move'; const routeLabel=`${item.departurePlace||'出発地未設定'} → ${item.arrivalPlace||'到着地未設定'}`; const titleHasRoute=(item.title||'').includes('→')||(item.title||'')===routeLabel; if(isMove){ const displayTitle=titleHasRoute?'':(item.title||'移動'); return (
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', rowGap:6, columnGap:10, alignItems:'center', width:'100%' }}>
         <div className="muted" style={{ fontSize:13, gridColumn:'1 / -1' }}>{routeLabel}</div>
-        <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>{displayTitle&&<span className="item-title">{displayTitle}</span>}{item.notes&&<span className="muted" style={{ fontSize:12 }}>・{item.notes}</span>}</div>
+        <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>{displayTitle&&<span className="item-title">{displayTitle}</span>}</div>
         {durationLabel && <div className="badge">所要 {durationLabel}</div>}
         <div style={{ display:'flex', gap:8 }}><button className="ghost" onClick={()=>setEditing(true)}>編集</button><button className="ghost" onClick={onDelete}>削除</button></div>
       </div>
@@ -138,7 +142,6 @@ function ListItemContent({ item, date, durationLabel, onSaved, onDelete }: { ite
     <div style={{ flex:1, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
       <span className="item-title">{item.title}</span>
       {item.location && <span className="muted" style={{ fontSize:13 }}>{item.location}</span>}
-      {item.notes && <span className="muted" style={{ fontSize:12 }}>・{item.notes}</span>}
     </div>
     {durationLabel && <div className="badge">所要 {durationLabel}</div>}
     <button className="ghost" onClick={()=>setEditing(true)}>編集</button>

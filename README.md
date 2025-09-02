@@ -74,6 +74,19 @@ npm run dev  # http://localhost:5173 （/api は http://localhost:4000 へプロ
 curl http://localhost:4000/api/health
 ```
 
+### Google認証の設定（任意）
+
+1) Google Cloud Console で OAuth クライアント（Web）を作成し、Client ID を取得
+   - 認証情報 → 認証情報を作成 → OAuth クライアントID → アプリの種類: Web
+   - 承認済みのJavaScript生成元: `http://localhost:5173`
+2) 環境変数を設定
+   - `backend/.env` に `GOOGLE_CLIENT_ID` と `JWT_SECRET` を追加
+   - `frontend` の起動環境に `VITE_GOOGLE_CLIENT_ID` を追加（例: `.env.local` に `VITE_GOOGLE_CLIENT_ID=...`）
+3) マイグレーション（User 追加）
+   - `cd backend && npx prisma migrate dev --name add_user_auth`
+
+起動後、ヘッダー右の「Googleでログイン」からサインインできます。
+
 ## ルーティング / 画面構成
 
 - 一覧（タイムライン）: `/day/YYYY-MM-DD`
@@ -122,6 +135,12 @@ curl http://localhost:4000/api/health
 - `POST /api/item` `{ date, title, startTime(HH:mm), endTime?, kind?, departurePlace?, arrivalPlace?, notes? }` 作成
 - `PUT /api/item/:id` 項目更新
 - `DELETE /api/item/:id` 項目削除
+
+### 認証系
+
+- `POST /api/auth/google` body `{ idToken }` GoogleのIDトークンを検証し、JWTクッキーを発行
+- `GET /api/me` ログイン中のユーザー情報
+- `POST /api/logout` ログアウト（クッキー削除）
 
 ## テーマ
 

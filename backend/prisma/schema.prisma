@@ -9,12 +9,16 @@ datasource db {
 
 model DaySchedule {
   id        Int            @id @default(autoincrement())
-  date      DateTime       @unique
+  date      DateTime
   title     String?
   notes     String?
   items     ScheduleItem[]
+  user      User?          @relation(fields: [userId], references: [id])
+  userId    Int?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
+
+  @@unique([userId, date])
 }
 
 model ScheduleItem {
@@ -35,6 +39,16 @@ model ScheduleItem {
   updatedAt  DateTime    @updatedAt
 
   @@index([scheduleId, startTime])
+}
+
+model User {
+  id        Int           @id @default(autoincrement())
+  googleId  String        @unique
+  email     String?       @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime      @default(now())
+  schedules DaySchedule[]
 }
 
 enum ItemKind {

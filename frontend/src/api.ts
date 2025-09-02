@@ -20,6 +20,13 @@ export type ScheduleItem = {
   notes?: string | null;
 };
 
+export type User = {
+  id: number;
+  email?: string | null;
+  name?: string | null;
+  avatarUrl?: string | null;
+};
+
 const json = (r: Response) => r.ok ? r.json() : r.json().then(e => Promise.reject(e));
 
 export async function fetchDay(dateStr: string): Promise<{ schedule: DaySchedule | null }>{
@@ -62,3 +69,20 @@ export async function deleteItem(id: number) {
 const pad = (n: number) => String(n).padStart(2, '0');
 export const toDateInput = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
 export const toTimeInput = (date: Date) => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+export async function me(): Promise<{ user: User | null }> {
+  const res = await fetch('/api/me');
+  return json(res);
+}
+
+export async function loginWithGoogleIdToken(idToken: string): Promise<{ user: User }>{
+  const res = await fetch('/api/auth/google', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken })
+  });
+  return json(res);
+}
+
+export async function logout() {
+  const res = await fetch('/api/logout', { method: 'POST' });
+  return json(res);
+}

@@ -1,15 +1,22 @@
 import 'dotenv/config';
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, NextFunction } from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
+import cookieParser from 'cookie-parser';
+import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 
 const prisma = new PrismaClient();
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(cookieParser());
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Health check
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -23,14 +30,69 @@ const parseDateOnly = (dateStr: string) => {
   return d;
 };
 
+type ReqUser = { userId: number } | undefined;
+function authOptional(req: Request & { user?: ReqUser }, _res: Response, next: NextFunction) {
+  const token = req.cookies?.session;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET) as { uid: number };
+      req.user = { userId: payload.uid };
+    } catch {}
+  }
+  next();
+}
+function ensureAuth(req: Request & { user?: ReqUser }, res: Response, next: NextFunction) {
+  if (!req.user) return res.status(401).json({ error: 'unauthorized' });
+  next();
+}
+
+app.use(authOptional);
+
+// Auth routes
+app.post('/api/auth/google', async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({ idToken: z.string().min(10) });
+    const { idToken } = schema.parse(req.body);
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+    const payload = ticket.getPayload();
+    if (!payload) return res.status(400).json({ error: 'invalid token' });
+    const googleId = payload.sub!;
+    const email = payload.email || null;
+    const name = payload.name || null;
+    const avatarUrl = payload.picture || null;
+    const user = await prisma.user.upsert({
+      where: { googleId },
+      update: { email: email || undefined, name: name || undefined, avatarUrl: avatarUrl || undefined },
+      create: { googleId, email, name, avatarUrl },
+      select: { id: true, email: true, name: true, avatarUrl: true },
+    });
+    const token = jwt.sign({ uid: user.id }, JWT_SECRET, { expiresIn: '30d' });
+    res.cookie('session', token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 30*24*60*60*1000 });
+    return res.json({ user });
+  } catch (e: any) {
+    return res.status(400).json({ error: e.message });
+  }
+});
+
+app.get('/api/me', async (req: Request & { user?: ReqUser }, res: Response) => {
+  if (!req.user) return res.json({ user: null });
+  const user = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { id: true, email: true, name: true, avatarUrl: true } });
+  return res.json({ user });
+});
+
+app.post('/api/logout', (req: Request, res: Response) => {
+  res.clearCookie('session');
+  res.json({ ok: true });
+});
+
 // Get day schedule with items
-app.get('/api/day', async (req: Request, res: Response) => {
+app.get('/api/day', ensureAuth, async (req: Request & { user?: ReqUser }, res: Response) => {
   try {
     const dateStr = String(req.query.date || '');
     if (!dateStr) return res.status(400).json({ error: 'date is required' });
     const date = parseDateOnly(dateStr);
     const schedule = await prisma.daySchedule.findUnique({
-      where: { date },
+      where: { userId_date: { userId: req.user!.userId, date } },
       include: { items: { orderBy: { startTime: 'asc' } } },
     });
     return res.json({ schedule });
@@ -40,7 +102,7 @@ app.get('/api/day', async (req: Request, res: Response) => {
 });
 
 // Upsert day schedule title/notes
-app.post('/api/day', async (req: Request, res: Response) => {
+app.post('/api/day', ensureAuth, async (req: Request & { user?: ReqUser }, res: Response) => {
   try {
     const bodySchema = z.object({
       date: z.string(),
@@ -50,9 +112,9 @@ app.post('/api/day', async (req: Request, res: Response) => {
     const body = bodySchema.parse(req.body);
     const date = parseDateOnly(body.date);
     const schedule = await prisma.daySchedule.upsert({
-      where: { date },
+      where: { userId_date: { userId: req.user!.userId, date } },
       update: { title: body.title, notes: body.notes },
-      create: { date, title: body.title, notes: body.notes },
+      create: { date, title: body.title, notes: body.notes, userId: req.user!.userId },
       include: { items: { orderBy: { startTime: 'asc' } } },
     });
     return res.json({ schedule });
@@ -62,7 +124,7 @@ app.post('/api/day', async (req: Request, res: Response) => {
 });
 
 // Create item
-app.post('/api/item', async (req: Request, res: Response) => {
+app.post('/api/item', ensureAuth, async (req: Request & { user?: ReqUser }, res: Response) => {
   try {
     const bodySchema = z.object({
       date: z.string(),
@@ -83,9 +145,9 @@ app.post('/api/item', async (req: Request, res: Response) => {
     const end = body.endTime ? new Date(`${body.date}T${body.endTime}:00`) : null;
     const kind = (body.kind || 'GENERAL').toUpperCase() as 'GENERAL' | 'MOVE';
     const schedule = await prisma.daySchedule.upsert({
-      where: { date },
+      where: { userId_date: { userId: req.user!.userId, date } },
       update: {},
-      create: { date },
+      create: { date, userId: req.user!.userId },
     });
     const item = await prisma.scheduleItem.create({
       data: {
@@ -109,7 +171,7 @@ app.post('/api/item', async (req: Request, res: Response) => {
 });
 
 // Update item
-app.put('/api/item/:id', async (req: Request, res: Response) => {
+app.put('/api/item/:id', ensureAuth, async (req: Request & { user?: ReqUser }, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'invalid id' });
@@ -131,6 +193,9 @@ app.put('/api/item/:id', async (req: Request, res: Response) => {
     let end: Date | null | undefined;
     if (body.startTime && body.date) start = new Date(`${body.date}T${body.startTime}:00`);
     if (body.endTime && body.date) end = new Date(`${body.date}T${body.endTime}:00`);
+    // ownership check
+    const existing = await prisma.scheduleItem.findUnique({ where: { id }, include: { schedule: { select: { userId: true } } } });
+    if (!existing || existing.schedule.userId !== req.user!.userId) return res.status(404).json({ error: 'not found' });
     const item = await prisma.scheduleItem.update({
       where: { id },
       data: {
@@ -153,10 +218,12 @@ app.put('/api/item/:id', async (req: Request, res: Response) => {
 });
 
 // Delete item
-app.delete('/api/item/:id', async (req: Request, res: Response) => {
+app.delete('/api/item/:id', ensureAuth, async (req: Request & { user?: ReqUser }, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'invalid id' });
+    const existing = await prisma.scheduleItem.findUnique({ where: { id }, include: { schedule: { select: { userId: true } } } });
+    if (!existing || existing.schedule.userId !== req.user!.userId) return res.status(404).json({ error: 'not found' });
     await prisma.scheduleItem.delete({ where: { id } });
     return res.json({ ok: true });
   } catch (e: any) {

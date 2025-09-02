@@ -122,6 +122,9 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
           const top = overrides[it.id] ?? originalTop;
           const computedHeight = Math.max(MIN_DURATION_MIN, (Math.max(0, (end.getTime() - start.getTime())) / 60000) * pxPerMin);
           const height = overrideHeights[it.id] ?? computedHeight;
+          const isMove = (it.kind || 'general') === 'move';
+          const routeLabel = `${it.departurePlace || '出発地未設定'} → ${it.arrivalPlace || '到着地未設定'}`;
+          const titleHasRoute = (it.title || '').includes('→') || (it.title || '') === routeLabel;
           return (
             <div
               key={it.id}
@@ -131,10 +134,9 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
               onPointerUp={(e)=>onPointerUp(e, it)}
             >
               <div className="daycal-event-title">{it.title}</div>
-              {((it.kind || 'general') === 'move') ? (
-                <div className="daycal-event-sub">{(it.departurePlace || '出発地未設定')} → {(it.arrivalPlace || '到着地未設定')}</div>
+              {isMove && !titleHasRoute ? (
+                <div className="daycal-event-sub">{routeLabel}</div>
               ) : null}
-              {it.notes && <div className="daycal-event-notes">{it.notes}</div>}
               <div className="daycal-resize"
                 onPointerDown={(e)=>{
                   e.stopPropagation();

@@ -4,6 +4,7 @@ import { DaySchedule, fetchDay, updateItem, toDateInput, createItem } from '../a
 import DayCalendar from '../DayCalendar';
 import BottomNav from '../components/BottomNav';
 import { getTheme, setTheme, type Theme } from '../theme';
+import AuthButton from '../components/AuthButton';
 import { addDays } from '../date';
 
 export default function DayCalendarPage(){
@@ -53,9 +54,12 @@ export default function DayCalendarPage(){
     <div className="container" style={{ paddingBottom: 80 }}>
       <header className="header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <span className="brand">旅のしおり</span>
-        <button className="ghost" onClick={onToggleTheme} aria-label={`テーマ: ${themeLabel}`} title={`テーマ: ${themeLabel}`}>
-          {theme === 'auto' ? '自動' : theme === 'light' ? 'ライト' : 'ダーク'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="ghost" onClick={onToggleTheme} aria-label={`テーマ: ${themeLabel}`} title={`テーマ: ${themeLabel}`}>
+            {theme === 'auto' ? '自動' : theme === 'light' ? 'ライト' : 'ダーク'}
+          </button>
+          <AuthButton onAuth={() => { /* stay */ }} />
+        </div>
       </header>
       <section className="card" style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>

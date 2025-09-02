@@ -114,6 +114,22 @@ button.secondary { background: var(--accent-2); }
 button.ghost { background: #fff; border: 1px dashed #e9d5df; color: var(--muted); }
 button:active { transform: translateY(1px); }
 
+/* Header actions: 強めのコントラスト */
+.header .ghost, .authbtn {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: var(--text);
+  font-weight: 800;
+}
+.header .ghost:hover, .authbtn:hover { box-shadow: 0 0 0 4px var(--ring); }
+
+:root[data-theme="dark"] .header .ghost,
+:root[data-theme="dark"] .authbtn {
+  background: rgba(255,255,255,0.95);
+  border-color: rgba(255,255,255,0.85);
+  color: #111827; /* 強い文字色 */
+}
+
 .timeline {
   display: grid;
   grid-template-columns: 100px 1fr;
