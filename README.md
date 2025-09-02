@@ -6,11 +6,13 @@
 
 <p>
   <a href="https://react.dev"><img alt="React" src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=000" /></a>
+  <a href="https://nodejs.org/"><img alt="Node.js" src="https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=fff" /></a>
   <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=fff" /></a>
   <a href="https://vitejs.dev/"><img alt="Vite" src="https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=fff" /></a>
   <a href="https://expressjs.com/"><img alt="Express" src="https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=fff" /></a>
   <a href="https://www.prisma.io/"><img alt="Prisma" src="https://img.shields.io/badge/Prisma-ORM-2D3748?logo=prisma&logoColor=fff" /></a>
   <a href="https://www.postgresql.org/"><img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=fff" /></a>
+  <a href="https://www.docker.com/"><img alt="Docker" src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=fff" /></a>
   <a href="#%E3%83%86%E3%83%BC%E3%83%9E"><img alt="Theme" src="https://img.shields.io/badge/Theme-Light%20%2F%20Dark%20%2F%20Auto-8B5CF6?logo=apple&logoColor=fff" /></a>
 </p>
 
@@ -19,10 +21,11 @@
 ## 特徴
 
 - ドラッグ&ドロップで時間移動／下端リサイズで終了時刻変更（カレンダー）
+  - 移動は5分刻み、リサイズは最小15分から
 - クリックでその時刻に「予定追加」ボトムシートを表示（カレンダー）
 - 出発地/到着地から所要時間を自動計算、見やすいタイムライン（リスト）
-- モバイル最適化（2ページ構成＋下部タブ）
-- テーマ切替（ライト/ダーク/自動）とダーク時の立体背景
+- モバイル最適化（2ページ構成＋下部タブ／日付ピッカーと「前日/今日/翌日」）
+- テーマ切替（ライト/ダーク/自動）。ライトでも立体背景を薄く表示、ダークで強調
 
 ## 構成 / 技術スタック
 
@@ -71,6 +74,20 @@ npm run dev  # http://localhost:5173 （/api は http://localhost:4000 へプロ
 curl http://localhost:4000/api/health
 ```
 
+## ルーティング / 画面構成
+
+- 一覧（タイムライン）: `/day/YYYY-MM-DD`
+- 1日カレンダー: `/calendar/YYYY-MM-DD`
+- 画面下部のタブでページ切替。右上の「前日/今日/翌日」ボタンと日付ピッカーで日付移動できます
+
+## 操作ガイド（要点）
+
+- 予定の追加（カレンダー）: 空きグリッドをタップ → 開いたシートで「出発地/到着地・出発/到着・メモ」を入力 → 追加
+- 予定の移動（カレンダー）: イベントをドラッグ（5分刻み）
+- 予定の長さ変更（カレンダー）: イベント下端をドラッグ（最小15分）
+- 予定の編集（一覧）: 各行の「編集」から同じ項目（出発地/到着地・時刻・メモ）を更新
+- テーマ切替: ヘッダー右のトグルで「自動 → ライト → ダーク」を巡回
+
 ## 秘匿情報（Git管理しない）
 
 - 秘匿情報は `.env` に配置し Git から除外（`.gitignore` 済）
@@ -109,7 +126,7 @@ curl http://localhost:4000/api/health
 ## テーマ
 
 - ライト/ダーク/自動のテーマ切替（ヘッダー右のトグル）
-- 自動は OS 設定に追従、ダーク時のみ 3D 背景（react-three-fiber）
+- 自動は OS 設定に追従。ライトでは背景の立体オブジェクトを薄く、ダークでははっきり表示（react-three-fiber）
 
 ## 今後の拡張
 

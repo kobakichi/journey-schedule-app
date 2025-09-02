@@ -9,6 +9,9 @@
   --accent-3: #e9d5ff; /* violet-200 */
   --ring: rgba(139, 92, 246, 0.25);
   --brand: #111111;
+  --bg3d-opacity: 0.4; /* light: さらに見せる */
+  --bg3d-sat: 1.1;
+  --bg3d-blur: 0.25px;
 }
 
 /* Dark theme (forced) */
@@ -22,6 +25,9 @@
   --accent-3: #c4b5fd;
   --ring: rgba(139, 92, 246, 0.35);
   --brand: #ffffff;
+  --bg3d-opacity: 0.6;
+  --bg3d-sat: 1.05;
+  --bg3d-blur: 0.5px;
 }
 
 /* Dark theme (auto by OS) */
@@ -36,6 +42,9 @@
     --accent-3: #c4b5fd;
     --ring: rgba(139, 92, 246, 0.35);
     --brand: #ffffff;
+    --bg3d-opacity: 0.6;
+    --bg3d-sat: 1.05;
+    --bg3d-blur: 0.5px;
   }
 }
 
@@ -146,15 +155,9 @@ button:active { transform: translateY(1px); }
   font-weight: 800;
 }
 
-.bg3d { position: fixed; inset: 0; z-index: 0; pointer-events: none; display: none; }
-.bg3d canvas { filter: saturate(0.9); }
+.bg3d { position: fixed; inset: 0; z-index: 0; pointer-events: none; display: block; opacity: var(--bg3d-opacity); filter: saturate(var(--bg3d-sat)) blur(var(--bg3d-blur)); }
+.bg3d canvas { filter: none; }
 .container { position: relative; z-index: 1; }
-
-/* Show 3D background in dark mode only */
-:root[data-theme="dark"] .bg3d { display: block; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .bg3d { display: block; }
-}
 
 .bottomnav {
   position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
