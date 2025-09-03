@@ -16,6 +16,15 @@ function minsFromMidnight(d: Date) {
   return d.getHours() * 60 + d.getMinutes();
 }
 
+// ピンク系の既存データ色を中立色に置換
+const neutralizeColor = (c?: string | null): string | undefined => {
+  if (!c) return undefined;
+  const s = String(c).toLowerCase().trim();
+  const sNoSpace = s.replace(/\s+/g, '');
+  if (s === '#ffd1dc' || sNoSpace === 'rgb(255,209,220)') return '#E5E7EB';
+  return c || undefined;
+};
+
 export default function DayCalendar({ items, date, onChangeTime, onRequestCreate }: Props) {
   const hours = useMemo(()=>Array.from({ length: 25 }, (_, i) => i), []);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -129,7 +138,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
             <div
               key={it.id}
               className="daycal-event"
-              style={{ top, height, borderLeftColor: it.color || '#FFD1DC', touchAction: 'none' }}
+              style={{ top, height, borderLeftColor: neutralizeColor(it.color) || '#E5E7EB', touchAction: 'none' }}
               onPointerDown={(e)=>onPointerDown(e, it)}
               onPointerUp={(e)=>onPointerUp(e, it)}
             >

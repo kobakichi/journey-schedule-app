@@ -32,8 +32,8 @@ export default function ThreeBg() {
       <spotLight position={[-6, -3, 8]} intensity={0.9} angle={0.3} penumbra={0.5} />
 
       <Blob color="#7dd3fc" position={[-3, 1.2, -2]} scale={2.2} speed={0.3} />
-      <Blob color="#c4b5fd" position={[2.5, -1.0, -1.5]} scale={1.8} speed={0.45} />
-      <Blob color="#f0abfc" position={[0.5, 2.0, -3]} scale={1.6} speed={0.35} />
+      <Blob color="#93c5fd" position={[2.5, -1.0, -1.5]} scale={1.8} speed={0.45} />
+      <Blob color="#bfdbfe" position={[0.5, 2.0, -3]} scale={1.6} speed={0.35} />
     </Canvas>
   );
 }

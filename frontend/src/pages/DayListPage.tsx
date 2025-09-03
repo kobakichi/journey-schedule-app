@@ -6,6 +6,14 @@ import BottomNav from '../components/BottomNav';
 import { getTheme, setTheme, type Theme } from '../theme';
 import AuthButton from '../components/AuthButton';
 import { addDays } from '../date';
+// ピンク系の既存データ色を中立色に置換
+const neutralizeColor = (c?: string | null): string | undefined => {
+  if (!c) return undefined;
+  const s = String(c).toLowerCase().trim();
+  const sNoSpace = s.replace(/\s+/g, '');
+  if (s === '#ffd1dc' || sNoSpace === 'rgb(255,209,220)') return '#E5E7EB';
+  return c || undefined;
+};
 
 type NewItemState = { startTime: string; endTime: string; departurePlace: string; arrivalPlace: string; notes: string; };
 
@@ -42,18 +50,18 @@ export default function DayListPage(){
   async function removeItem(id: number){ if(!confirm('この項目を削除しますか？'))return; try{ await deleteItem(id); const refreshed = await fetchDay(date); setSchedule(refreshed.schedule);} catch(e:any){ alert(e?.error || '削除に失敗しました'); } }
 
   const [theme, setThemeState] = useState<Theme>(getTheme());
-  function nextTheme(t: Theme): Theme { return t === 'auto' ? 'light' : t === 'light' ? 'dark' : 'auto'; }
-  function onToggleTheme(){ const t = nextTheme(theme); setThemeState(t); setTheme(t); }
-  const themeLabel = theme === 'auto' ? '自動' : theme === 'light' ? 'ライト' : 'ダーク';
+  const isDark = theme === 'dark';
+  function toggleTheme(){ const t: Theme = isDark ? 'light' : 'dark'; setThemeState(t); setTheme(t); }
 
   return (
     <div className="container" style={{ paddingBottom: 80 }}>
       <header className="header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <span className="brand">旅のしおり</span>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="ghost" onClick={onToggleTheme} aria-label={`テーマ: ${themeLabel}`} title={`テーマ: ${themeLabel}`}>
-            {theme === 'auto' ? '自動' : theme === 'light' ? 'ライト' : 'ダーク'}
-          </button>
+        <div className="header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label className="theme-switch" title={`テーマ: ${isDark ? 'ダーク' : 'ライト'}`}> 
+            <input type="checkbox" checked={isDark} onChange={toggleTheme} aria-label="テーマ切り替え" />
+            <span className="slider" />
+          </label>
           <AuthButton onAuth={() => { /* stay */ }} />
         </div>
       </header>
@@ -74,7 +82,7 @@ export default function DayListPage(){
           <strong>項目を追加</strong>
         </div>
         <div className="divider" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div className="formgrid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <input placeholder="出発地（移動の場合）" value={newItem.departurePlace} onChange={(e)=>setNewItem({ ...newItem, departurePlace: e.target.value })} />
           <input placeholder="到着地（移動の場合）" value={newItem.arrivalPlace} onChange={(e)=>setNewItem({ ...newItem, arrivalPlace: e.target.value })} />
           <input aria-label="出発時刻" placeholder="出発時刻" type="time" value={newItem.startTime} onChange={(e)=>setNewItem({ ...newItem, startTime: e.target.value })} />
@@ -87,7 +95,7 @@ export default function DayListPage(){
         </div>
       </section>
 
-      <section className="card" style={{ minHeight: 420, marginTop: 12 }}>
+      <section className="card" style={{ marginTop: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <strong>タイムライン（リスト）</strong>
           {loading ? <span className="muted">読み込み中…</span> : error ? <span className="muted">{error}</span> : <span className="muted">{date}</span>}
@@ -101,7 +109,7 @@ export default function DayListPage(){
             return (
               <div key={it.id} style={{ display:'contents' }}>
                 <div className="timecell">{span}</div>
-                <div className="item" style={{ borderLeft:`6px solid ${it.color||'#FFD1DC'}` }}>
+                <div className="item">
                   <ListItemContent item={it} date={date} durationLabel={dur} onSaved={async()=>{ const r=await fetchDay(date); setSchedule(r.schedule); }} onDelete={()=>removeItem(it.id)} />
                 </div>
               </div>
@@ -131,24 +139,37 @@ function ListItemContent({ item, date, durationLabel, onSaved, onDelete }: { ite
     } catch(e:any){ alert(e?.error || '更新に失敗しました'); }
   }
   if(!editing){ const isMove=(item.kind||'general')==='move'; const routeLabel=`${item.departurePlace||'出発地未設定'} → ${item.arrivalPlace||'到着地未設定'}`; const titleHasRoute=(item.title||'').includes('→')||(item.title||'')===routeLabel; if(isMove){ const displayTitle=titleHasRoute?'':(item.title||'移動'); return (
-      <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', rowGap:6, columnGap:10, alignItems:'center', width:'100%' }}>
-        <div className="muted" style={{ fontSize:13, gridColumn:'1 / -1' }}>{routeLabel}</div>
-        <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>{displayTitle&&<span className="item-title">{displayTitle}</span>}</div>
-        {durationLabel && <div className="badge">所要 {durationLabel}</div>}
-        <div style={{ display:'flex', gap:8 }}><button className="ghost" onClick={()=>setEditing(true)}>編集</button><button className="ghost" onClick={onDelete}>削除</button></div>
+      <div className="listitem-grid" style={{ display:'grid', gridTemplateColumns:'1fr auto', rowGap:4, columnGap:12, alignItems:'center', width:'100%' }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:4, minWidth:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', minWidth:0 }}>
+            {displayTitle && <span className="item-title">{displayTitle}</span>}
+            <span className="muted" style={{ fontSize:13, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{routeLabel}</span>
+          </div>
+          {durationLabel && <div className="badge" style={{ alignSelf: 'flex-start', width: 'fit-content', maxWidth: '100%' }}>所要 {durationLabel}</div>}
+        </div>
+        <div style={{ display:'flex', gap:8 }}>
+          <button className="secondary" onClick={()=>setEditing(true)}>編集</button>
+          <button className="danger" onClick={onDelete}>削除</button>
+        </div>
       </div>
   ); }
-  return (<>
-    <div style={{ flex:1, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-      <span className="item-title">{item.title}</span>
-      {item.location && <span className="muted" style={{ fontSize:13 }}>{item.location}</span>}
-    </div>
-    {durationLabel && <div className="badge">所要 {durationLabel}</div>}
-    <button className="ghost" onClick={()=>setEditing(true)}>編集</button>
-    <button className="ghost" onClick={onDelete}>削除</button>
-  </>); }
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, width:'100%' }}>
+    <div className="listitem-grid" style={{ display:'grid', gridTemplateColumns:'1fr auto', rowGap:4, columnGap:12, alignItems:'center', width:'100%' }}>
+      <div style={{ display:'flex', flexDirection:'column', gap:4, minWidth:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', minWidth:0 }}>
+          <span className="item-title">{item.title}</span>
+          {item.location && <span className="muted" style={{ fontSize:13, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.location}</span>}
+        </div>
+        {durationLabel && <div className="badge" style={{ alignSelf: 'flex-start', width: 'fit-content', maxWidth: '100%' }}>所要 {durationLabel}</div>}
+      </div>
+      <div style={{ display:'flex', gap:8 }}>
+        <button className="secondary" onClick={()=>setEditing(true)}>編集</button>
+        <button className="danger" onClick={onDelete}>削除</button>
+      </div>
+    </div>
+  ); }
+  return (
+    <div className="formgrid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, width:'100%' }}>
       <input placeholder="出発地（移動の場合）" value={form.departurePlace} onChange={(e)=>setForm({ ...form, departurePlace: e.target.value })} />
       <input placeholder="到着地（移動の場合）" value={form.arrivalPlace} onChange={(e)=>setForm({ ...form, arrivalPlace: e.target.value })} />
       <input aria-label="出発時刻" placeholder="出発時刻" type="time" value={form.startTime} onChange={(e)=>setForm({ ...form, startTime: e.target.value })} />

@@ -46,18 +46,18 @@ export default function DayCalendarPage(){
   }
 
   const [theme, setThemeState] = useState<Theme>(getTheme());
-  function nextTheme(t: Theme): Theme { return t === 'auto' ? 'light' : t === 'light' ? 'dark' : 'auto'; }
-  function onToggleTheme(){ const t = nextTheme(theme); setThemeState(t); setTheme(t); }
-  const themeLabel = theme === 'auto' ? '自動' : theme === 'light' ? 'ライト' : 'ダーク';
+  const isDark = theme === 'dark';
+  function toggleTheme(){ const t: Theme = isDark ? 'light' : 'dark'; setThemeState(t); setTheme(t); }
 
   return (
     <div className="container" style={{ paddingBottom: 80 }}>
       <header className="header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <span className="brand">旅のしおり</span>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="ghost" onClick={onToggleTheme} aria-label={`テーマ: ${themeLabel}`} title={`テーマ: ${themeLabel}`}>
-            {theme === 'auto' ? '自動' : theme === 'light' ? 'ライト' : 'ダーク'}
-          </button>
+        <div className="header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label className="theme-switch" title={`テーマ: ${isDark ? 'ダーク' : 'ライト'}`}>
+            <input type="checkbox" checked={isDark} onChange={toggleTheme} aria-label="テーマ切り替え" />
+            <span className="slider" />
+          </label>
           <AuthButton onAuth={() => { /* stay */ }} />
         </div>
       </header>

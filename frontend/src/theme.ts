@@ -1,10 +1,10 @@
-export type Theme = 'light' | 'dark' | 'auto';
+export type Theme = 'light' | 'dark';
 
 const THEME_KEY = 'journey.theme';
 
 export function getTheme(): Theme {
-  const t = localStorage.getItem(THEME_KEY) as Theme | null;
-  return t || 'auto';
+  const t = localStorage.getItem(THEME_KEY);
+  return t === 'dark' ? 'dark' : 'light';
 }
 
 export function setTheme(theme: Theme) {
@@ -14,10 +14,9 @@ export function setTheme(theme: Theme) {
 
 export function applyTheme(theme: Theme) {
   const root = document.documentElement;
-  root.setAttribute('data-theme', theme === 'auto' ? 'auto' : theme);
+  root.setAttribute('data-theme', theme);
 }
 
 export function initTheme() {
   applyTheme(getTheme());
 }
-

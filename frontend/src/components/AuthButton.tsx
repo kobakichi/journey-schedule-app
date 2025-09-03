@@ -16,13 +16,21 @@ function loadScript(src: string): Promise<void> {
 
 export default function AuthButton({ onAuth }: { onAuth?: (u: User | null) => void }){
   const [user, setUser] = useState<User | null>(null);
+  const [avatarError, setAvatarError] = useState(false);
   const [gsiReady, setGsiReady] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+  const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth <= 640 : false);
+
+  useEffect(() => {
+    function onResize(){ setIsMobile(window.innerWidth <= 640); }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => { (async () => {
-    try { const { user } = await me(); setUser(user); onAuth?.(user); } catch {}
+    try { const { user } = await me(); setUser(user); setAvatarError(false); onAuth?.(user); } catch {}
   })(); }, []);
 
   async function initGsi() {
@@ -37,7 +45,7 @@ export default function AuthButton({ onAuth }: { onAuth?: (u: User | null) => vo
       callback: async (response: any) => {
         try {
           const { user } = await loginWithGoogleIdToken(response.credential);
-          setUser(user); onAuth?.(user);
+          setUser(user); setAvatarError(false); onAuth?.(user);
         } catch (e: any) {
           alert(e?.error || 'ログインに失敗しました');
         }
@@ -46,7 +54,10 @@ export default function AuthButton({ onAuth }: { onAuth?: (u: User | null) => vo
     });
     if (containerRef.current) {
       containerRef.current.innerHTML = '';
-      google.accounts.id.renderButton(containerRef.current, { theme: 'outline', size: 'large', shape: 'pill', width: 220, text: 'signin_with' });
+      const width = isMobile ? 160 : 220;
+      const size = isMobile ? 'medium' : 'large';
+      const text = isMobile ? 'signin' : 'signin_with';
+      google.accounts.id.renderButton(containerRef.current, { theme: 'outline', size, shape: 'pill', width, text });
       setGsiReady(true);
     }
   }
@@ -55,6 +66,7 @@ export default function AuthButton({ onAuth }: { onAuth?: (u: User | null) => vo
     try{
       await logout();
       setUser(null);
+      setAvatarError(false);
       setGsiReady(false); // 再度フォールバックボタンを表示して、次のログインをしやすく
       if (containerRef.current) containerRef.current.innerHTML = '';
       onAuth?.(null);
@@ -74,19 +86,44 @@ export default function AuthButton({ onAuth }: { onAuth?: (u: User | null) => vo
     }
   }, [user, gsiReady, clientId]);
 
+  function Avatar(){
+    const size = isMobile ? 24 : 28;
+    const url = (!avatarError && user?.avatarUrl) ? String(user?.avatarUrl) : '';
+    if (url) {
+      return (
+        <span className="avatar" style={{ width: size, height: size }}>
+          <img
+            src={url}
+            alt={user?.name || user?.email || 'user'}
+            referrerPolicy="no-referrer"
+            decoding="async"
+            loading="lazy"
+            onError={() => setAvatarError(true)}
+          />
+        </span>
+      );
+    }
+    const letter = (user?.name || user?.email || '?').slice(0,1).toUpperCase();
+    return (
+      <span className="avatar avatar-fallback" aria-hidden style={{ width: size, height: size, borderRadius: '50%', fontSize: size-12 }}>
+        {letter}
+      </span>
+    );
+  }
+
   if (user) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {user.avatarUrl && <img src={user.avatarUrl} alt={user.name || 'user'} style={{ width: 28, height: 28, borderRadius: 999 }} />}
-        <span className="muted" style={{ fontSize: 13 }}>{user.name || user.email || 'ログイン中'}</span>
+      <div className="authwrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Avatar />
+        {!isMobile && <span className="muted" style={{ fontSize: 13 }}>{user.name || user.email || 'ログイン中'}</span>}
         <button className="ghost" onClick={doLogout}>ログアウト</button>
       </div>
     );
   }
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div className="authwrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <div
-        style={{ position: 'relative', width: 220, height: 40, display: 'inline-block' }}
+        style={{ position: 'relative', width: isMobile ? 160 : 220, height: 40, display: 'inline-block' }}
       >
         <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
         {showFallback && !gsiReady && (
@@ -95,7 +132,7 @@ export default function AuthButton({ onAuth }: { onAuth?: (u: User | null) => vo
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
             onClick={initGsi}
           >
-            Googleでログイン
+            {isMobile ? 'ログイン' : 'Googleでログイン'}
           </button>
         )}
       </div>
