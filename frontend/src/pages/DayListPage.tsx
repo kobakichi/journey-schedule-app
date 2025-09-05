@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createItem, DaySchedule, deleteItem, fetchDay, toDateInput, toTimeInput, updateItem, type ScheduleItem as ApiItem, upsertDay } from '../api';
-import { durationMinutes, formatDuration } from '../time';
+import { durationMinutes, formatDuration, toLocalWallClock } from '../time';
 import BottomNav from '../components/BottomNav';
 import { getTheme, setTheme, type Theme } from '../theme';
 import AuthButton from '../components/AuthButton';
@@ -104,7 +104,7 @@ export default function DayListPage(){
         <div className="timeline">
           {items.length===0 && <div className="muted">この日にまだ予定はありません</div>}
           {items.map(it=>{
-            const start=new Date(it.startTime); const end=it.endTime?new Date(it.endTime):null; const span=end?`${toTimeInput(start)} - ${toTimeInput(end)}`:`${toTimeInput(start)}`;
+            const start=toLocalWallClock(it.startTime); const end=it.endTime?toLocalWallClock(it.endTime):null; const span=end?`${toTimeInput(start)} - ${toTimeInput(end)}`:`${toTimeInput(start)}`;
             const dur=end?formatDuration(durationMinutes(start,end)):'';
             return (
               <div key={it.id} style={{ display:'contents' }}>
@@ -127,7 +127,7 @@ import { type ScheduleItem as Item } from '../api';
 function ListItemContent({ item, date, durationLabel, onSaved, onDelete }: { item: Item; date: string; durationLabel: string; onSaved: ()=>void|Promise<void>; onDelete: ()=>void; }){
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
-    startTime: toTimeInput(new Date(item.startTime)), endTime: item.endTime?toTimeInput(new Date(item.endTime)):'',
+    startTime: toTimeInput(toLocalWallClock(item.startTime)), endTime: item.endTime?toTimeInput(toLocalWallClock(item.endTime)):'' ,
     departurePlace: item.departurePlace || '', arrivalPlace: item.arrivalPlace || '', notes: item.notes || '',
   });
   async function save(){

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ScheduleItem } from './api';
+import { toLocalWallClock } from './time';
 
 type Props = {
   items: ScheduleItem[];
@@ -37,8 +38,8 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
   useEffect(()=>{ const onUp = () => { setDrag(null); setResize(null); }; window.addEventListener('pointerup', onUp); return () => window.removeEventListener('pointerup', onUp); },[]);
 
   function onPointerDown(e: React.PointerEvent, it: ScheduleItem){
-    const start = new Date(it.startTime);
-    const end = it.endTime ? new Date(it.endTime) : new Date(start.getTime()+30*60000);
+    const start = toLocalWallClock(it.startTime);
+    const end = it.endTime ? toLocalWallClock(it.endTime) : new Date(start.getTime()+30*60000);
     const top = minsFromMidnight(start) * pxPerMin;
     const duration = Math.max(30, Math.round((end.getTime()-start.getTime())/60000));
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -125,8 +126,8 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
         ))}
         {showNow && <div style={{ position:'absolute', left:0, right:0, top: nowTop, height: 2, background: '#ef4444', opacity: 0.8 }} />}
         {items.map((it) => {
-          const start = new Date(it.startTime);
-          const end = it.endTime ? new Date(it.endTime) : new Date(start.getTime() + 30 * 60000);
+          const start = toLocalWallClock(it.startTime);
+          const end = it.endTime ? toLocalWallClock(it.endTime) : new Date(start.getTime() + 30 * 60000);
           const originalTop = minsFromMidnight(start) * pxPerMin;
           const top = overrides[it.id] ?? originalTop;
           const computedHeight = Math.max(MIN_DURATION_MIN, (Math.max(0, (end.getTime() - start.getTime())) / 60000) * pxPerMin);
@@ -149,8 +150,8 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
               <div className="daycal-resize"
                 onPointerDown={(e)=>{
                   e.stopPropagation();
-                  const start = new Date(it.startTime);
-                  const end = it.endTime ? new Date(it.endTime) : new Date(start.getTime()+30*60000);
+                  const start = toLocalWallClock(it.startTime);
+                  const end = it.endTime ? toLocalWallClock(it.endTime) : new Date(start.getTime()+30*60000);
                   const h = Math.max(MIN_DURATION_MIN, (Math.max(0, (end.getTime() - start.getTime())) / 60000) * pxPerMin);
                   (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
                   setResize({ id: it.id, startHeight: h, startY: e.clientY, top });

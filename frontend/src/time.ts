@@ -13,3 +13,12 @@ export function formatDuration(mins: number): string {
   return `${m}分`;
 }
 
+// サーバーからのISO文字列（Z付き: UTC）を「壁時計の時刻」を保ったローカルDateに変換
+// 例: '2025-09-05T09:00:00.000Z' -> ローカルタイムの 09:00 を表すDate
+export function toLocalWallClock(dateIsoFromServer: string): Date {
+  const d = new Date(dateIsoFromServer);
+  return new Date(
+    d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(),
+    d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()
+  );
+}
