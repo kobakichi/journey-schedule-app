@@ -28,7 +28,7 @@ const neutralizeColor = (c?: string | null): string | undefined => {
 
 const LONG_PRESS_DRAG_MS = 250;
 const LONG_PRESS_RESIZE_MS = 250;
-const LONG_PRESS_CREATE_MS = 420;
+const LONG_PRESS_CREATE_MS = 1000; // 新規作成は約1秒の長押しで開始
 const CANCEL_MOVE_PX = 14;
 
 export default function DayCalendar({ items, date, onChangeTime, onRequestCreate }: Props) {
@@ -45,6 +45,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
   const pendingDragRef = useRef<{ id: number; startTop: number; startY: number; duration: number } | null>(null);
   const pendingResizeRef = useRef<{ id: number; startHeight: number; startY: number; top: number } | null>(null);
   const gridTouchStartRef = useRef<{ y: number } | null>(null);
+  const lastGridPointerTypeRef = useRef<string | null>(null);
   const suppressNextGridClickRef = useRef<boolean>(false);
 
   useEffect(()=>{ const onUp = () => {
@@ -167,6 +168,12 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
 
   function onGridClick(e: React.MouseEvent){
     if(!onRequestCreate) return;
+    // スマホ（直前のポインタがタッチ）の単純タップでは作成しない
+    if (lastGridPointerTypeRef.current === 'touch') {
+      // 次の操作のためにリセット
+      lastGridPointerTypeRef.current = null;
+      return;
+    }
     if (suppressNextGridClickRef.current) { suppressNextGridClickRef.current = false; return; }
     const target = e.target as HTMLElement;
     if (target.closest('.daycal-event') || target.closest('.daycal-resize')) return;
@@ -181,6 +188,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
   }
 
   function onGridPointerDown(e: React.PointerEvent){
+    lastGridPointerTypeRef.current = (e as any).pointerType || null;
     if ((e as any).pointerType !== 'touch') return;
     if(!onRequestCreate) return;
     const target = e.target as HTMLElement;
@@ -199,7 +207,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
       suppressNextGridClickRef.current = true;
       onRequestCreate(`${hh}:${mm}`);
       gridTouchStartRef.current = null;
-    }, 450);
+    }, LONG_PRESS_CREATE_MS);
   }
 
   return (

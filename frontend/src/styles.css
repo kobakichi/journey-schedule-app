@@ -258,7 +258,8 @@ button:active { transform: translateY(1px); }
   .date-nav { justify-content: center; }
   .date-nav input[type="date"] { order: 1; flex: 1 1 100%; }
   .date-nav button { order: 2; }
-  .daycal-grabber { width: 56px; height: 6px; }
+  .daycal-grabber { height: 34px; }
+  .daycal-grabber::after { width: 84px; height: 8px; top: 10px; }
 }
 
 .bg3d { position: fixed; inset: 0; z-index: 0; pointer-events: none; display: block; opacity: var(--bg3d-opacity); filter: saturate(var(--bg3d-sat)) blur(var(--bg3d-blur)); }
@@ -328,22 +329,32 @@ button:active { transform: translateY(1px); }
   border: 1px solid #eef2ff;
   border-radius: 10px;
   box-shadow: 0 10px 20px rgba(0,0,0,0.06);
-  /* 上部のドラッグつまみとタイトルが被らないよう上の余白を拡大 */
-  padding: 20px 10px 8px;
+  /* 上部のドラッグつまみとタイトルが被らないよう余白を拡大 */
+  padding: 28px 10px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 .daycal-grabber {
   position: absolute;
-  top: 6px;
+  top: 2px;
+  left: 0;
+  right: 0;
+  height: 28px; /* タッチしやすい広い当たり判定 */
+  background: transparent;
+  touch-action: none;
+  z-index: 1;
+}
+.daycal-grabber::after {
+  content: '';
+  position: absolute;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%);
-  width: 42px;
+  width: 64px;
   height: 6px;
   border-radius: 999px;
-  background: #e5e7eb;
-  touch-action: none;
+  background: #e5e7eb; /* 見た目のつまみは中央に表示 */
 }
 .daycal-event { cursor: pointer; }
 .daycal-event-title { font-weight: 800; color: #374151; }
