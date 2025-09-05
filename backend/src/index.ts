@@ -24,10 +24,25 @@ app.get('/api/health', (_req: Request, res: Response) => {
 });
 
 // Helpers
-const parseDateOnly = (dateStr: string) => {
-  const d = new Date(dateStr + 'T00:00:00');
-  if (isNaN(d.getTime())) throw new Error('Invalid date');
-  return d;
+// YYYY-MM-DD をサーバー環境のタイムゾーンに依存せず UTC の 00:00 として解釈
+const parseDateOnlyUTC = (dateStr: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr));
+  if (!m) throw new Error('Invalid date');
+  const y = Number(m[1]);
+  const mo = Number(m[2]) - 1;
+  const d = Number(m[3]);
+  const dt = new Date(Date.UTC(y, mo, d, 0, 0, 0, 0));
+  return dt;
+};
+
+// YYYY-MM-DD + HH:mm を UTC として Date を生成（サーバーのローカルTZに依存しない）
+const utcDateTimeFrom = (dateStr: string, hhmm: string) => {
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr));
+  const tm = /^(\d{2}):(\d{2})$/.exec(String(hhmm));
+  if (!dm || !tm) throw new Error('Invalid date/time');
+  const y = Number(dm[1]); const mo = Number(dm[2]) - 1; const d = Number(dm[3]);
+  const h = Number(tm[1]); const mi = Number(tm[2]);
+  return new Date(Date.UTC(y, mo, d, h, mi, 0, 0));
 };
 
 type ReqUser = { userId: number } | undefined;
@@ -90,7 +105,7 @@ app.get('/api/day', ensureAuth, async (req: Request & { user?: ReqUser }, res: R
   try {
     const dateStr = String(req.query.date || '');
     if (!dateStr) return res.status(400).json({ error: 'date is required' });
-    const date = parseDateOnly(dateStr);
+    const date = parseDateOnlyUTC(dateStr);
     const schedule = await prisma.daySchedule.findUnique({
       where: { userId_date: { userId: req.user!.userId, date } },
       include: { items: { orderBy: { startTime: 'asc' } } },
@@ -110,7 +125,7 @@ app.post('/api/day', ensureAuth, async (req: Request & { user?: ReqUser }, res: 
       notes: z.string().optional(),
     });
     const body = bodySchema.parse(req.body);
-    const date = parseDateOnly(body.date);
+    const date = parseDateOnlyUTC(body.date);
     const schedule = await prisma.daySchedule.upsert({
       where: { userId_date: { userId: req.user!.userId, date } },
       update: { title: body.title, notes: body.notes },
@@ -140,9 +155,9 @@ app.post('/api/item', ensureAuth, async (req: Request & { user?: ReqUser }, res:
       notes: z.string().optional(),
     });
     const body = bodySchema.parse(req.body);
-    const date = parseDateOnly(body.date);
-    const start = new Date(`${body.date}T${body.startTime}:00`);
-    const end = body.endTime ? new Date(`${body.date}T${body.endTime}:00`) : null;
+    const date = parseDateOnlyUTC(body.date);
+    const start = utcDateTimeFrom(body.date, body.startTime);
+    const end = body.endTime ? utcDateTimeFrom(body.date, body.endTime) : null;
     const kind = (body.kind || 'GENERAL').toUpperCase() as 'GENERAL' | 'MOVE';
     const schedule = await prisma.daySchedule.upsert({
       where: { userId_date: { userId: req.user!.userId, date } },
@@ -191,8 +206,8 @@ app.put('/api/item/:id', ensureAuth, async (req: Request & { user?: ReqUser }, r
     const body = bodySchema.parse(req.body);
     let start: Date | undefined;
     let end: Date | null | undefined;
-    if (body.startTime && body.date) start = new Date(`${body.date}T${body.startTime}:00`);
-    if (body.endTime && body.date) end = new Date(`${body.date}T${body.endTime}:00`);
+    if (body.startTime && body.date) start = utcDateTimeFrom(body.date, body.startTime);
+    if (body.endTime && body.date) end = utcDateTimeFrom(body.date, body.endTime);
     // ownership check
     const existing = await prisma.scheduleItem.findUnique({ where: { id }, include: { schedule: { select: { userId: true } } } });
     if (!existing || existing.schedule.userId !== req.user!.userId) return res.status(404).json({ error: 'not found' });
