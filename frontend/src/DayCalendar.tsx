@@ -34,16 +34,43 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
   const [resize, setResize] = useState<{ id: number; startHeight: number; startY: number; top: number; }|null>(null);
   const [overrides, setOverrides] = useState<Record<number, number>>({}); // id -> top px
   const [overrideHeights, setOverrideHeights] = useState<Record<number, number>>({}); // id -> height px
+  const longPressTimerRef = useRef<number | null>(null); // for drag start
+  const longPressResizeTimerRef = useRef<number | null>(null);
+  const longPressCreateTimerRef = useRef<number | null>(null);
+  const pendingDragRef = useRef<{ id: number; startTop: number; startY: number; duration: number } | null>(null);
+  const pendingResizeRef = useRef<{ id: number; startHeight: number; startY: number; top: number } | null>(null);
+  const gridTouchStartRef = useRef<{ y: number } | null>(null);
+  const suppressNextGridClickRef = useRef<boolean>(false);
 
-  useEffect(()=>{ const onUp = () => { setDrag(null); setResize(null); }; window.addEventListener('pointerup', onUp); return () => window.removeEventListener('pointerup', onUp); },[]);
+  useEffect(()=>{ const onUp = () => {
+    setDrag(null); setResize(null);
+    if (longPressTimerRef.current) { window.clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+    if (longPressResizeTimerRef.current) { window.clearTimeout(longPressResizeTimerRef.current); longPressResizeTimerRef.current = null; }
+    if (longPressCreateTimerRef.current) { window.clearTimeout(longPressCreateTimerRef.current); longPressCreateTimerRef.current = null; }
+    pendingDragRef.current = null;
+    pendingResizeRef.current = null;
+    gridTouchStartRef.current = null;
+  }; window.addEventListener('pointerup', onUp); return () => window.removeEventListener('pointerup', onUp); },[]);
 
   function onPointerDown(e: React.PointerEvent, it: ScheduleItem){
     const start = toLocalWallClock(it.startTime);
     const end = it.endTime ? toLocalWallClock(it.endTime) : new Date(start.getTime()+30*60000);
     const top = minsFromMidnight(start) * pxPerMin;
     const duration = Math.max(30, Math.round((end.getTime()-start.getTime())/60000));
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    setDrag({ id: it.id, startTop: top, startY: e.clientY, duration });
+    if ((e as any).pointerType === 'touch') {
+      // モバイルは長押しでドラッグ開始（誤操作防止）
+      pendingDragRef.current = { id: it.id, startTop: top, startY: e.clientY, duration };
+      if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = window.setTimeout(() => {
+        if (pendingDragRef.current) {
+          setDrag({ ...pendingDragRef.current });
+        }
+      }, 350);
+      // タイマー発火前はスクロールをブロックしないため pointer capture は行わない
+    } else {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      setDrag({ id: it.id, startTop: top, startY: e.clientY, duration });
+    }
   }
   function onPointerMove(e: React.PointerEvent){
     const cont = containerRef.current; const grid = gridRef.current; if(!cont||!grid) return;
@@ -57,6 +84,31 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
       setOverrides(prev => ({ ...prev, [drag.id]: nextTop }));
       return;
     }
+    if (pendingDragRef.current) {
+      // 長押し前に大きく動いたら（スクロール意図）ドラッグをキャンセル
+      const dy = Math.abs(e.clientY - pendingDragRef.current.startY);
+      if (dy > 8) {
+        if (longPressTimerRef.current) { window.clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+        pendingDragRef.current = null;
+      }
+      return;
+    }
+    if (pendingResizeRef.current) {
+      const dy = Math.abs(e.clientY - pendingResizeRef.current.startY);
+      if (dy > 8) {
+        if (longPressResizeTimerRef.current) { window.clearTimeout(longPressResizeTimerRef.current); longPressResizeTimerRef.current = null; }
+        pendingResizeRef.current = null;
+      }
+      return;
+    }
+    if (gridTouchStartRef.current) {
+      const dy = Math.abs(e.clientY - gridTouchStartRef.current.y);
+      if (dy > 8) {
+        if (longPressCreateTimerRef.current) { window.clearTimeout(longPressCreateTimerRef.current); longPressCreateTimerRef.current = null; }
+        gridTouchStartRef.current = null;
+      }
+      return;
+    }
     if(resize){
       const delta = y - (resize.startY - rect.top + scrollTop);
       let nextHeight = Math.round((resize.startHeight + delta) / SNAP_MIN) * SNAP_MIN;
@@ -66,6 +118,13 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
     }
   }
   function onPointerUp(_e: React.PointerEvent, it: ScheduleItem){
+    // 長押し待ちを解除
+    if (longPressTimerRef.current) { window.clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+    if (longPressResizeTimerRef.current) { window.clearTimeout(longPressResizeTimerRef.current); longPressResizeTimerRef.current = null; }
+    if (longPressCreateTimerRef.current) { window.clearTimeout(longPressCreateTimerRef.current); longPressCreateTimerRef.current = null; }
+    pendingDragRef.current = null;
+    pendingResizeRef.current = null;
+    gridTouchStartRef.current = null;
     if(drag){
       const top = overrides[it.id] ?? drag.startTop;
       const startMin = Math.round(top);
@@ -99,6 +158,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
 
   function onGridClick(e: React.MouseEvent){
     if(!onRequestCreate) return;
+    if (suppressNextGridClickRef.current) { suppressNextGridClickRef.current = false; return; }
     const target = e.target as HTMLElement;
     if (target.closest('.daycal-event') || target.closest('.daycal-resize')) return;
     const cont = containerRef.current; const grid = gridRef.current; if(!cont||!grid) return;
@@ -111,6 +171,28 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
     onRequestCreate(`${hh}:${mm}`);
   }
 
+  function onGridPointerDown(e: React.PointerEvent){
+    if ((e as any).pointerType !== 'touch') return;
+    if(!onRequestCreate) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('.daycal-event') || target.closest('.daycal-resize')) return;
+    const cont = containerRef.current; const grid = gridRef.current; if(!cont||!grid) return;
+    const rect = grid.getBoundingClientRect();
+    gridTouchStartRef.current = { y: e.clientY };
+    if (longPressCreateTimerRef.current) window.clearTimeout(longPressCreateTimerRef.current);
+    longPressCreateTimerRef.current = window.setTimeout(() => {
+      if (!gridTouchStartRef.current) return;
+      const y = gridTouchStartRef.current.y - rect.top + cont.scrollTop;
+      let mins = Math.round(y / SNAP_MIN) * SNAP_MIN;
+      mins = Math.max(0, Math.min(1439, mins));
+      const hh = String(Math.floor(mins/60)).padStart(2,'0');
+      const mm = String(mins%60).padStart(2,'0');
+      suppressNextGridClickRef.current = true;
+      onRequestCreate(`${hh}:${mm}`);
+      gridTouchStartRef.current = null;
+    }, 450);
+  }
+
   return (
     <div className="daycal" ref={containerRef} onPointerMove={onPointerMove}>
       <div className="daycal-hours">
@@ -120,7 +202,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
           </div>
         ))}
       </div>
-      <div className="daycal-grid" ref={gridRef} onClick={onGridClick}>
+      <div className="daycal-grid" ref={gridRef} onClick={onGridClick} onPointerDown={onGridPointerDown}>
         {hours.map((h) => (
           <div key={h} className="daycal-gridline" style={{ height: 60 * pxPerMin }} />
         ))}
@@ -139,7 +221,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
             <div
               key={it.id}
               className="daycal-event"
-              style={{ top, height, borderLeftColor: neutralizeColor(it.color) || '#E5E7EB', touchAction: 'none' }}
+              style={{ top, height, borderLeftColor: neutralizeColor(it.color) || '#E5E7EB', touchAction: 'manipulation' }}
               onPointerDown={(e)=>onPointerDown(e, it)}
               onPointerUp={(e)=>onPointerUp(e, it)}
             >
@@ -153,8 +235,18 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
                   const start = toLocalWallClock(it.startTime);
                   const end = it.endTime ? toLocalWallClock(it.endTime) : new Date(start.getTime()+30*60000);
                   const h = Math.max(MIN_DURATION_MIN, (Math.max(0, (end.getTime() - start.getTime())) / 60000) * pxPerMin);
-                  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-                  setResize({ id: it.id, startHeight: h, startY: e.clientY, top });
+                  if ((e as any).pointerType === 'touch') {
+                    pendingResizeRef.current = { id: it.id, startHeight: h, startY: e.clientY, top };
+                    if (longPressResizeTimerRef.current) window.clearTimeout(longPressResizeTimerRef.current);
+                    longPressResizeTimerRef.current = window.setTimeout(() => {
+                      if (pendingResizeRef.current) {
+                        setResize({ ...pendingResizeRef.current });
+                      }
+                    }, 350);
+                  } else {
+                    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                    setResize({ id: it.id, startHeight: h, startY: e.clientY, top });
+                  }
                 }}
               />
             </div>
