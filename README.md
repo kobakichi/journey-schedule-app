@@ -106,6 +106,22 @@ After starting, sign in via the “Sign in with Google” button on the header.
 - For sharing defaults, update `backend/.env.example`, and each developer creates their own `.env`
 - Example: `DATABASE_URL=postgresql://journey:journey@localhost:5432/journey?schema=public`
 
+## Deployment
+
+- Frontend: Vercel (Root Directory: `frontend/`)
+  - API proxy: `/api/*` → Render backend via `frontend/vercel.json`
+  - Env: `VITE_GOOGLE_CLIENT_ID`
+- Backend (API): Render Web Service (Node)
+  - Build: `npm ci --include=dev && npm run prisma:generate && npm run build`
+  - Start: `npx prisma migrate deploy && npm start`
+  - Env: `DATABASE_URL` (Neon; use pooling/`sslmode=require`), `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `NODE_ENV=production`
+- Database: Neon (PostgreSQL 15+)
+  - Use pooled connection (PgBouncer) and `sslmode=require`
+
+Notes
+- Vercel rewrites `/api/*` to Render so cookies work same-origin. See `frontend/vercel.json`.
+- Server stores times in UTC; UI renders wall-clock times consistently across regions.
+
 ## Server Commands
 
 — DB (PostgreSQL / Docker Compose)
