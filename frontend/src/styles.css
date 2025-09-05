@@ -258,6 +258,7 @@ button:active { transform: translateY(1px); }
   .date-nav { justify-content: center; }
   .date-nav input[type="date"] { order: 1; flex: 1 1 100%; }
   .date-nav button { order: 2; }
+  .daycal-grabber { width: 56px; height: 6px; }
 }
 
 .bg3d { position: fixed; inset: 0; z-index: 0; pointer-events: none; display: block; opacity: var(--bg3d-opacity); filter: saturate(var(--bg3d-sat)) blur(var(--bg3d-blur)); }
@@ -298,6 +299,7 @@ button:active { transform: translateY(1px); }
   gap: 8px;
   height: 600px;
   overflow: auto;
+  overscroll-behavior: contain;
   border-radius: 12px;
 }
 .daycal-hours { position: relative; }
@@ -330,6 +332,17 @@ button:active { transform: translateY(1px); }
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+.daycal-grabber {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 42px;
+  height: 6px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  touch-action: none;
 }
 .daycal-event { cursor: pointer; }
 .daycal-event-title { font-weight: 800; color: #374151; }

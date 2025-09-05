@@ -26,6 +26,11 @@ const neutralizeColor = (c?: string | null): string | undefined => {
   return c || undefined;
 };
 
+const LONG_PRESS_DRAG_MS = 250;
+const LONG_PRESS_RESIZE_MS = 250;
+const LONG_PRESS_CREATE_MS = 420;
+const CANCEL_MOVE_PX = 14;
+
 export default function DayCalendar({ items, date, onChangeTime, onRequestCreate }: Props) {
   const hours = useMemo(()=>Array.from({ length: 25 }, (_, i) => i), []);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,7 +70,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
         if (pendingDragRef.current) {
           setDrag({ ...pendingDragRef.current });
         }
-      }, 350);
+      }, LONG_PRESS_DRAG_MS);
       // タイマー発火前はスクロールをブロックしないため pointer capture は行わない
     } else {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -73,6 +78,10 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
     }
   }
   function onPointerMove(e: React.PointerEvent){
+    // ドラッグ/リサイズ中はスクロール抑止（特にタッチ）
+    if ((drag || resize) && (e as any).pointerType === 'touch') {
+      e.preventDefault();
+    }
     const cont = containerRef.current; const grid = gridRef.current; if(!cont||!grid) return;
     const rect = grid.getBoundingClientRect();
     const scrollTop = cont.scrollTop;
@@ -87,7 +96,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
     if (pendingDragRef.current) {
       // 長押し前に大きく動いたら（スクロール意図）ドラッグをキャンセル
       const dy = Math.abs(e.clientY - pendingDragRef.current.startY);
-      if (dy > 8) {
+      if (dy > CANCEL_MOVE_PX) {
         if (longPressTimerRef.current) { window.clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
         pendingDragRef.current = null;
       }
@@ -95,7 +104,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
     }
     if (pendingResizeRef.current) {
       const dy = Math.abs(e.clientY - pendingResizeRef.current.startY);
-      if (dy > 8) {
+      if (dy > CANCEL_MOVE_PX) {
         if (longPressResizeTimerRef.current) { window.clearTimeout(longPressResizeTimerRef.current); longPressResizeTimerRef.current = null; }
         pendingResizeRef.current = null;
       }
@@ -103,7 +112,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
     }
     if (gridTouchStartRef.current) {
       const dy = Math.abs(e.clientY - gridTouchStartRef.current.y);
-      if (dy > 8) {
+      if (dy > CANCEL_MOVE_PX) {
         if (longPressCreateTimerRef.current) { window.clearTimeout(longPressCreateTimerRef.current); longPressCreateTimerRef.current = null; }
         gridTouchStartRef.current = null;
       }
@@ -194,7 +203,12 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
   }
 
   return (
-    <div className="daycal" ref={containerRef} onPointerMove={onPointerMove}>
+    <div
+      className="daycal"
+      ref={containerRef}
+      onPointerMove={onPointerMove}
+      style={{ touchAction: (drag || resize) ? ('none' as any) : undefined }}
+    >
       <div className="daycal-hours">
         {hours.map((h) => (
           <div key={h} className="daycal-hour" style={{ height: 60 * pxPerMin }}>
@@ -225,6 +239,22 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
               onPointerDown={(e)=>onPointerDown(e, it)}
               onPointerUp={(e)=>onPointerUp(e, it)}
             >
+              {/* Drag grabber (immediate drag start on touch) */}
+              <div
+                className="daycal-grabber"
+                onPointerDown={(e)=>{
+                  e.stopPropagation();
+                  const s = toLocalWallClock(it.startTime);
+                  const eEnd = it.endTime ? toLocalWallClock(it.endTime) : new Date(s.getTime()+30*60000);
+                  const topNow = minsFromMidnight(s) * pxPerMin;
+                  const dur = Math.max(30, Math.round((eEnd.getTime()-s.getTime())/60000));
+                  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                  // cancel any pending long-press states
+                  if (longPressTimerRef.current) { window.clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+                  pendingDragRef.current = null;
+                  setDrag({ id: it.id, startTop: topNow, startY: e.clientY, duration: dur });
+                }}
+              />
               <div className="daycal-event-title">{it.title}</div>
               {isMove && !titleHasRoute ? (
                 <div className="daycal-event-sub">{routeLabel}</div>
@@ -242,7 +272,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
                       if (pendingResizeRef.current) {
                         setResize({ ...pendingResizeRef.current });
                       }
-                    }, 350);
+                    }, LONG_PRESS_RESIZE_MS);
                   } else {
                     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
                     setResize({ id: it.id, startHeight: h, startY: e.clientY, top });
