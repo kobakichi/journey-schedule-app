@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://journey-schedule-app.onrender.com/api/$1"
+    }
+  ]
+}
