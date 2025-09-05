@@ -29,7 +29,8 @@ const neutralizeColor = (c?: string | null): string | undefined => {
 const LONG_PRESS_DRAG_MS = 250;
 const LONG_PRESS_RESIZE_MS = 250;
 const LONG_PRESS_CREATE_MS = 1000; // 新規作成は約1秒の長押しで開始
-const CANCEL_MOVE_PX = 14;
+const CANCEL_MOVE_PX = 4; // 移動し始めたらすぐ長押しをキャンセル（スクロール優先）
+const SCROLL_COOLDOWN_MS = 200; // スクロール直後の誤発火抑止
 
 export default function DayCalendar({ items, date, onChangeTime, onRequestCreate }: Props) {
   const hours = useMemo(()=>Array.from({ length: 25 }, (_, i) => i), []);
@@ -45,6 +46,9 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
   const pendingDragRef = useRef<{ id: number; startTop: number; startY: number; duration: number } | null>(null);
   const pendingResizeRef = useRef<{ id: number; startHeight: number; startY: number; top: number } | null>(null);
   const gridTouchStartRef = useRef<{ y: number } | null>(null);
+  const gridScrollStartRef = useRef<number | null>(null);
+  const scrollingRecentlyRef = useRef<boolean>(false);
+  const scrollingTimerRef = useRef<number | null>(null);
   const lastGridPointerTypeRef = useRef<string | null>(null);
   const suppressNextGridClickRef = useRef<boolean>(false);
 
@@ -56,6 +60,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
     pendingDragRef.current = null;
     pendingResizeRef.current = null;
     gridTouchStartRef.current = null;
+    gridScrollStartRef.current = null;
   }; window.addEventListener('pointerup', onUp); return () => window.removeEventListener('pointerup', onUp); },[]);
 
   function onPointerDown(e: React.PointerEvent, it: ScheduleItem){
@@ -113,9 +118,11 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
     }
     if (gridTouchStartRef.current) {
       const dy = Math.abs(e.clientY - gridTouchStartRef.current.y);
-      if (dy > CANCEL_MOVE_PX) {
+      // スクロールが始まった or 指が動いたら即キャンセル
+      if (dy > CANCEL_MOVE_PX || (cont && gridScrollStartRef.current !== null && cont.scrollTop !== gridScrollStartRef.current)) {
         if (longPressCreateTimerRef.current) { window.clearTimeout(longPressCreateTimerRef.current); longPressCreateTimerRef.current = null; }
         gridTouchStartRef.current = null;
+        gridScrollStartRef.current = null;
       }
       return;
     }
@@ -174,6 +181,8 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
       lastGridPointerTypeRef.current = null;
       return;
     }
+    // スクロール直後はクリック作成も抑止
+    if (scrollingRecentlyRef.current) return;
     if (suppressNextGridClickRef.current) { suppressNextGridClickRef.current = false; return; }
     const target = e.target as HTMLElement;
     if (target.closest('.daycal-event') || target.closest('.daycal-resize')) return;
@@ -191,14 +200,25 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
     lastGridPointerTypeRef.current = (e as any).pointerType || null;
     if ((e as any).pointerType !== 'touch') return;
     if(!onRequestCreate) return;
+    if (scrollingRecentlyRef.current) return; // スクロール直後は長押し開始しない
     const target = e.target as HTMLElement;
     if (target.closest('.daycal-event') || target.closest('.daycal-resize')) return;
     const cont = containerRef.current; const grid = gridRef.current; if(!cont||!grid) return;
     const rect = grid.getBoundingClientRect();
     gridTouchStartRef.current = { y: e.clientY };
+    gridScrollStartRef.current = cont.scrollTop;
     if (longPressCreateTimerRef.current) window.clearTimeout(longPressCreateTimerRef.current);
     longPressCreateTimerRef.current = window.setTimeout(() => {
       if (!gridTouchStartRef.current) return;
+      // スクロールが発生していたら作成しない
+      if (
+        scrollingRecentlyRef.current ||
+        (cont && gridScrollStartRef.current !== null && cont.scrollTop !== gridScrollStartRef.current)
+      ) {
+        gridTouchStartRef.current = null;
+        gridScrollStartRef.current = null;
+        return;
+      }
       const y = gridTouchStartRef.current.y - rect.top + cont.scrollTop;
       let mins = Math.round(y / SNAP_MIN) * SNAP_MIN;
       mins = Math.max(0, Math.min(1439, mins));
@@ -207,7 +227,14 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
       suppressNextGridClickRef.current = true;
       onRequestCreate(`${hh}:${mm}`);
       gridTouchStartRef.current = null;
+      gridScrollStartRef.current = null;
     }, LONG_PRESS_CREATE_MS);
+  }
+
+  function cancelGridLongPress() {
+    if (longPressCreateTimerRef.current) { window.clearTimeout(longPressCreateTimerRef.current); longPressCreateTimerRef.current = null; }
+    gridTouchStartRef.current = null;
+    gridScrollStartRef.current = null;
   }
 
   return (
@@ -215,7 +242,18 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
       className="daycal"
       ref={containerRef}
       onPointerMove={onPointerMove}
+      onScroll={() => {
+        // スクロール中/直後は新規追加の長押し・クリックを抑止
+        if (scrollingTimerRef.current) window.clearTimeout(scrollingTimerRef.current);
+        scrollingRecentlyRef.current = true;
+        scrollingTimerRef.current = window.setTimeout(() => {
+          scrollingRecentlyRef.current = false;
+          scrollingTimerRef.current = null;
+        }, SCROLL_COOLDOWN_MS);
+      }}
       style={{ touchAction: (drag || resize) ? ('none' as any) : undefined }}
+      onPointerLeave={cancelGridLongPress}
+      onPointerCancel={cancelGridLongPress}
     >
       <div className="daycal-hours">
         {hours.map((h) => (
