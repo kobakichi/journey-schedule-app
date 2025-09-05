@@ -328,7 +328,8 @@ button:active { transform: translateY(1px); }
   border: 1px solid #eef2ff;
   border-radius: 10px;
   box-shadow: 0 10px 20px rgba(0,0,0,0.06);
-  padding: 8px 10px;
+  /* 上部のドラッグつまみとタイトルが被らないよう上の余白を拡大 */
+  padding: 20px 10px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
