@@ -49,5 +49,5 @@ docker-compose.override.yml
 *.db-wal
 *.db-journal
 
-# Serena
+# Local agent workspace (do not publish)
 .serena/
