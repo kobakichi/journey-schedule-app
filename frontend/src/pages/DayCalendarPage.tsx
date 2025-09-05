@@ -62,7 +62,7 @@ export default function DayCalendarPage(){
         </div>
       </header>
       <section className="card" style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        <div className="date-nav">
           <button className="ghost" onClick={() => nav(`/calendar/${addDays(date, -1)}`)}>前日</button>
           <input type="date" value={date} onChange={(e)=> e.target.value && nav(`/calendar/${e.target.value}`)} />
           <button className="ghost" onClick={() => nav(`/calendar/${toDateInput(new Date())}`)}>今日</button>

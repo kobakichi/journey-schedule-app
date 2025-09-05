@@ -223,6 +223,15 @@ button:active { transform: translateY(1px); }
   font-weight: 800;
 }
 
+/* Date navigation (list page) */
+.date-nav {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
 /* Responsive (mobile-first tweaks) */
 @media (max-width: 640px) {
   .container { padding: 16px; }
@@ -245,6 +254,10 @@ button:active { transform: translateY(1px); }
   .formgrid { grid-template-columns: 1fr !important; }
   /* Buttons slightly smaller within timeline items */
   .timeline .item button { padding: 8px 10px; font-size: 13px; }
+  /* On small screens, place date picker on its own row and buttons below */
+  .date-nav { justify-content: center; }
+  .date-nav input[type="date"] { order: 1; flex: 1 1 100%; }
+  .date-nav button { order: 2; }
 }
 
 .bg3d { position: fixed; inset: 0; z-index: 0; pointer-events: none; display: block; opacity: var(--bg3d-opacity); filter: saturate(var(--bg3d-sat)) blur(var(--bg3d-blur)); }

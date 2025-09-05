@@ -48,4 +48,3 @@ docker-compose.override.yml
 *.db-shm
 *.db-wal
 *.db-journal
-
