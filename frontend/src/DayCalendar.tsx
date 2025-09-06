@@ -172,6 +172,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
   const now = new Date();
   const showNow = new Date(date).toDateString() === now.toDateString();
   const nowTop = minsFromMidnight(now) * pxPerMin;
+  const fmt = (m: number) => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
 
   function onGridClick(e: React.MouseEvent){
     if(!onRequestCreate) return;
@@ -274,6 +275,10 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
           const top = overrides[it.id] ?? originalTop;
           const computedHeight = Math.max(MIN_DURATION_MIN, (Math.max(0, (end.getTime() - start.getTime())) / 60000) * pxPerMin);
           const height = overrideHeights[it.id] ?? computedHeight;
+          const isDragging = !!drag && drag.id === it.id;
+          const isResizing = !!resize && resize.id === it.id;
+          const startMin = Math.round(top);
+          const endMin = Math.round(startMin + (isResizing ? height : computedHeight));
           const isMove = (it.kind || 'general') === 'move';
           const routeLabel = `${it.departurePlace || '出発地未設定'} → ${it.arrivalPlace || '到着地未設定'}`;
           const titleHasRoute = (it.title || '').includes('→') || (it.title || '') === routeLabel;
@@ -285,6 +290,11 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
               onPointerDown={(e)=>onPointerDown(e, it)}
               onPointerUp={(e)=>onPointerUp(e, it)}
             >
+              {(isDragging || isResizing) && (
+                <div className="daycal-timehint" aria-live="polite" aria-atomic>
+                  {fmt(startMin)}{it.endTime ? ` – ${fmt(endMin)}` : ''}
+                </div>
+              )}
               {/* Drag grabber (immediate drag start on touch) */}
               <div
                 className="daycal-grabber"
