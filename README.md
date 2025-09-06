@@ -91,6 +91,7 @@ After starting, sign in via the “Sign in with Google” button on the header.
 - Timeline list: `/day/YYYY-MM-DD`
 - Day calendar: `/calendar/YYYY-MM-DD`
 - Switch pages with the bottom tabs. Use the date picker and the Previous / Today / Next buttons to move across days.
+ - Shared view: append `?owner=OWNER_SLUG` to view a day shared by another user, e.g. `/calendar/2025-09-06?owner=ab12cdEF`（下部タブで一覧へ切替可）
 
 ## Usage (Highlights)
 
@@ -146,16 +147,43 @@ Notes
 ## API Overview (MVP)
 
 - `GET /api/day?date=YYYY-MM-DD` Get a day’s schedule and items
+- `GET /api/day?date=YYYY-MM-DD&owner=OWNER_SLUG` Get another user's shared schedule (slug-based, preferred; requires share)
+- `GET /api/day?date=YYYY-MM-DD&ownerId=USER_ID` Legacy: same as above with numeric id
 - `POST /api/day` `{ date, title?, notes? }` Create/update the day’s theme
-- `POST /api/item` `{ date, title, startTime(HH:mm), endTime?, kind?, departurePlace?, arrivalPlace?, notes? }` Create item
-- `PUT /api/item/:id` Update item
-- `DELETE /api/item/:id` Delete item
+- `POST /api/item` `{ date, title, startTime(HH:mm), endTime?, kind?, departurePlace?, arrivalPlace?, notes?, ownerSlug?, ownerId? }` Create item (if `ownerSlug`/`ownerId` is set and you have edit permission, adds to that owner's day)
+- `PUT /api/item/:id` Update item (edit allowed if you are owner or have share edit permission)
+- `DELETE /api/item/:id` Delete item (ditto)
 
 ### Auth
 
 - `POST /api/auth/google` body `{ idToken }` Verify Google ID Token and issue a JWT cookie
 - `GET /api/me` Current user info
 - `POST /api/logout` Logout (clear cookie)
+
+### Sharing (New)
+
+- `GET /api/share/day?date=YYYY-MM-DD` List shares for your day (owner only)
+- `POST /api/share/day` body `{ date, email, canEdit? }` Share your day to a user by email (the user must have signed-in at least once)
+- `DELETE /api/share/day?date=YYYY-MM-DD&userId=ID` Revoke a user’s access
+- `GET /api/shared/day/list?date=YYYY-MM-DD` Owners who shared their day with you (for the date)
+
+#### Invite Links (for users not yet logged-in)
+
+- `POST /api/share/day/invite` body `{ date, canEdit?, email?, ttlHours? }` Create an invite link (token). If `email` is set, the invite can only be accepted by a user with that email.
+- `GET /api/share/day/invites?date=YYYY-MM-DD` List invites you created for that day
+- `DELETE /api/share/day/invite/:id` Revoke an invite
+- `GET /api/share/invite/:token` Public metadata of an invite (no auth)
+- `POST /api/share/invite/:token/accept` Accept the invite (requires login); grants share permission and returns `{ ownerId, date }`
+
+Client
+- Invite accept page: `/invite/:token` (prompts login if needed, then accepts and redirects)
+
+Notes
+- Prefer slug-based links. To view another user's shared schedule, call `GET /api/day` with `owner=OWNER_SLUG` and the same `date`.
+- To add an item to a shared day you have edit permission for, call `POST /api/item` with `ownerSlug` set to the owner's public slug.
+- Apply DB migrations after pulling:
+  - Local: `cd backend && npx prisma migrate dev --name add_sharing && npx prisma migrate dev --name add_share_invites`
+  - Prod: `npx prisma migrate deploy`
 
 ## Theme
 

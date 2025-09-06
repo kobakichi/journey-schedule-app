@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { createItem, DaySchedule, deleteItem, fetchDay, toDateInput, toTimeInput, updateItem, type ScheduleItem as ApiItem, upsertDay } from '../api';
 import { durationMinutes, formatDuration, toLocalWallClock } from '../time';
 import BottomNav from '../components/BottomNav';
 import { getTheme, setTheme, type Theme } from '../theme';
 import AuthButton from '../components/AuthButton';
+import ShareManager from '../components/ShareManager';
 import { addDays } from '../date';
 // ピンク系の既存データ色を中立色に置換
 const neutralizeColor = (c?: string | null): string | undefined => {
@@ -20,6 +21,11 @@ type NewItemState = { startTime: string; endTime: string; departurePlace: string
 export default function DayListPage(){
   const { date: paramDate } = useParams();
   const date = paramDate || toDateInput(new Date());
+  const [searchParams] = useSearchParams();
+  const ownerSlugParam = searchParams.get('owner') || undefined;
+  const ownerIdParam = searchParams.get('ownerId');
+  const ownerId = ownerIdParam ? Number(ownerIdParam) : undefined;
+  const owner = ownerSlugParam ? ownerSlugParam : ownerId;
   const [schedule, setSchedule] = useState<DaySchedule | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,8 +35,8 @@ export default function DayListPage(){
 
   useEffect(() => { (async () => {
     setLoading(true); setError(null);
-    try { const res = await fetchDay(date); setSchedule(res.schedule); setTitle(res.schedule?.title || ''); } catch(e:any){ setError(e?.error || '読み込みに失敗しました'); } finally { setLoading(false); }
-  })(); }, [date]);
+    try { const res = await fetchDay(date, owner); setSchedule(res.schedule); setTitle(res.schedule?.title || ''); } catch(e:any){ setError(e?.error || '読み込みに失敗しました'); } finally { setLoading(false); }
+  })(); }, [date, owner]);
 
   async function saveDay(){ try{ const res = await upsertDay({ date, title }); setSchedule(res.schedule);} catch(e:any){ alert(e?.error || '保存に失敗しました'); } }
 
@@ -41,13 +47,13 @@ export default function DayListPage(){
     const computedKind = isMove ? 'move' : 'general';
     const computedTitle = isMove ? (newItem.departurePlace && newItem.arrivalPlace ? `${newItem.departurePlace} → ${newItem.arrivalPlace}` : '移動') : '予定';
     try {
-      await createItem({ date, title: computedTitle, startTime: newItem.startTime, endTime: newItem.endTime || undefined, kind: computedKind, departurePlace: isMove ? (newItem.departurePlace || undefined) : undefined, arrivalPlace: isMove ? (newItem.arrivalPlace || undefined) : undefined, notes: newItem.notes || undefined });
-      const refreshed = await fetchDay(date); setSchedule(refreshed.schedule);
+      await createItem({ date, title: computedTitle, startTime: newItem.startTime, endTime: newItem.endTime || undefined, kind: computedKind, departurePlace: isMove ? (newItem.departurePlace || undefined) : undefined, arrivalPlace: isMove ? (newItem.arrivalPlace || undefined) : undefined, notes: newItem.notes || undefined, ownerId: ownerSlugParam ? undefined : ownerId, ownerSlug: ownerSlugParam || undefined });
+      const refreshed = await fetchDay(date, owner); setSchedule(refreshed.schedule);
       setNewItem({ startTime: newItem.startTime, endTime: '', departurePlace: '', arrivalPlace: '', notes: '' });
     } catch(e:any){ alert(e?.error || '追加に失敗しました'); }
   }
 
-  async function removeItem(id: number){ if(!confirm('この項目を削除しますか？'))return; try{ await deleteItem(id); const refreshed = await fetchDay(date); setSchedule(refreshed.schedule);} catch(e:any){ alert(e?.error || '削除に失敗しました'); } }
+  async function removeItem(id: number){ if(!confirm('この項目を削除しますか？'))return; try{ await deleteItem(id); const refreshed = await fetchDay(date, owner); setSchedule(refreshed.schedule);} catch(e:any){ alert(e?.error || '削除に失敗しました'); } }
 
   const [theme, setThemeState] = useState<Theme>(getTheme());
   const isDark = theme === 'dark';
@@ -63,14 +69,15 @@ export default function DayListPage(){
             <span className="slider" />
           </label>
           <AuthButton onAuth={() => { /* stay */ }} />
+          <ShareManager date={date} ownerId={ownerId} ownerSlug={ownerSlugParam || undefined} />
         </div>
       </header>
       <section className="card" style={{ marginBottom: 12 }}>
         <div className="date-nav">
-          <button className="ghost" onClick={() => nav(`/day/${addDays(date, -1)}`)}>前日</button>
-          <input type="date" value={date} onChange={(e)=> e.target.value && nav(`/day/${e.target.value}`)} />
-          <button className="ghost" onClick={() => nav(`/day/${toDateInput(new Date())}`)}>今日</button>
-          <button className="ghost" onClick={() => nav(`/day/${addDays(date, 1)}`)}>翌日</button>
+          <button className="ghost" onClick={() => nav(`/day/${addDays(date, -1)}${ownerSlugParam ? `?owner=${ownerSlugParam}` : ownerId ? `?ownerId=${ownerId}` : ''}`)}>前日</button>
+          <input type="date" value={date} onChange={(e)=> e.target.value && nav(`/day/${e.target.value}${ownerSlugParam ? `?owner=${ownerSlugParam}` : ownerId ? `?ownerId=${ownerId}` : ''}`)} />
+          <button className="ghost" onClick={() => nav(`/day/${toDateInput(new Date())}${ownerSlugParam ? `?owner=${ownerSlugParam}` : ownerId ? `?ownerId=${ownerId}` : ''}`)}>今日</button>
+          <button className="ghost" onClick={() => nav(`/day/${addDays(date, 1)}${ownerSlugParam ? `?owner=${ownerSlugParam}` : ownerId ? `?ownerId=${ownerId}` : ''}`)}>翌日</button>
         </div>
         <div className="divider" />
         <label className="muted" style={{ fontWeight: 700, display: 'block', marginBottom: 8 }}>1日のテーマ</label>
@@ -110,7 +117,7 @@ export default function DayListPage(){
               <div key={it.id} style={{ display:'contents' }}>
                 <div className="timecell">{span}</div>
                 <div className="item">
-                  <ListItemContent item={it} date={date} durationLabel={dur} onSaved={async()=>{ const r=await fetchDay(date); setSchedule(r.schedule); }} onDelete={()=>removeItem(it.id)} />
+                  <ListItemContent item={it} date={date} durationLabel={dur} onSaved={async()=>{ const r=await fetchDay(date, owner); setSchedule(r.schedule); }} onDelete={()=>removeItem(it.id)} />
                 </div>
               </div>
             );

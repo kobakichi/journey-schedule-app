@@ -5,11 +5,11 @@ export default function BottomNav(){
   const loc = useLocation();
   const d = date || new Date().toISOString().slice(0,10);
   const isCal = loc.pathname.startsWith('/calendar');
+  const search = loc.search || '';
   return (
     <nav className="bottomnav">
-      <Link className={`tab ${!isCal ? 'active' : ''}`} to={`/day/${d}`}>一覧</Link>
-      <Link className={`tab ${isCal ? 'active' : ''}`} to={`/calendar/${d}`}>カレンダー</Link>
+      <Link className={`tab ${!isCal ? 'active' : ''}`} to={`/day/${d}${search}`}>一覧</Link>
+      <Link className={`tab ${isCal ? 'active' : ''}`} to={`/calendar/${d}${search}`}>カレンダー</Link>
     </nav>
   );
 }
-

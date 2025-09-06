@@ -1,25 +1,31 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DaySchedule, fetchDay, updateItem, toDateInput, createItem } from '../api';
 import DayCalendar from '../DayCalendar';
 import BottomNav from '../components/BottomNav';
 import { getTheme, setTheme, type Theme } from '../theme';
 import AuthButton from '../components/AuthButton';
+import ShareManager from '../components/ShareManager';
 import { addDays } from '../date';
 
 export default function DayCalendarPage(){
   const { date: paramDate } = useParams();
   const date = paramDate || new Date().toISOString().slice(0,10);
+  const [searchParams] = useSearchParams();
+  const ownerSlugParam = searchParams.get('owner') || undefined;
+  const ownerIdParam = searchParams.get('ownerId');
+  const ownerId = ownerIdParam ? Number(ownerIdParam) : undefined;
+  const owner = ownerSlugParam ? ownerSlugParam : ownerId;
   const [schedule, setSchedule] = useState<DaySchedule | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
   const [creating, setCreating] = useState<{ open: boolean; start: string; end: string; departurePlace: string; arrivalPlace: string; notes: string; }>()
 
-  useEffect(()=>{ (async()=>{ setLoading(true); setError(null); try{ const res = await fetchDay(date); setSchedule(res.schedule); } catch(e:any){ setError(e?.error||'読み込みに失敗しました'); } finally{ setLoading(false);} })(); }, [date]);
+  useEffect(()=>{ (async()=>{ setLoading(true); setError(null); try{ const res = await fetchDay(date, owner); setSchedule(res.schedule); } catch(e:any){ setError(e?.error||'読み込みに失敗しました'); } finally{ setLoading(false);} })(); }, [date, owner]);
 
   async function handleChangeTime(id: number, startHHmm: string, endHHmm?: string){
-    try{ await updateItem(id, { date, startTime: startHHmm, endTime: endHHmm }); const res = await fetchDay(date); setSchedule(res.schedule); }catch(e:any){ alert(e?.error || '時間の更新に失敗しました'); }
+    try{ await updateItem(id, { date, startTime: startHHmm, endTime: endHHmm }); const res = await fetchDay(date, owner); setSchedule(res.schedule); }catch(e:any){ alert(e?.error || '時間の更新に失敗しました'); }
   }
 
   function handleRequestCreate(startHHmm: string){
@@ -39,8 +45,8 @@ export default function DayCalendarPage(){
       ? (creating.departurePlace && creating.arrivalPlace ? `${creating.departurePlace} → ${creating.arrivalPlace}` : '移動')
       : '予定';
     try {
-      await createItem({ date, title, startTime: creating.start, endTime: creating.end || undefined, kind: isMove ? 'move' : 'general', departurePlace: isMove ? (creating.departurePlace || undefined) : undefined, arrivalPlace: isMove ? (creating.arrivalPlace || undefined) : undefined, notes: creating.notes || undefined });
-      const res = await fetchDay(date); setSchedule(res.schedule);
+      await createItem({ date, title, startTime: creating.start, endTime: creating.end || undefined, kind: isMove ? 'move' : 'general', departurePlace: isMove ? (creating.departurePlace || undefined) : undefined, arrivalPlace: isMove ? (creating.arrivalPlace || undefined) : undefined, notes: creating.notes || undefined, ownerId: ownerSlugParam ? undefined : ownerId, ownerSlug: ownerSlugParam || undefined });
+      const res = await fetchDay(date, owner); setSchedule(res.schedule);
       setCreating(undefined);
     } catch(e:any){ alert(e?.error || '追加に失敗しました'); }
   }
@@ -59,14 +65,15 @@ export default function DayCalendarPage(){
             <span className="slider" />
           </label>
           <AuthButton onAuth={() => { /* stay */ }} />
+          <ShareManager date={date} ownerId={ownerId} ownerSlug={ownerSlugParam || undefined} />
         </div>
       </header>
       <section className="card" style={{ marginBottom: 12 }}>
         <div className="date-nav">
-          <button className="ghost" onClick={() => nav(`/calendar/${addDays(date, -1)}`)}>前日</button>
-          <input type="date" value={date} onChange={(e)=> e.target.value && nav(`/calendar/${e.target.value}`)} />
-          <button className="ghost" onClick={() => nav(`/calendar/${toDateInput(new Date())}`)}>今日</button>
-          <button className="ghost" onClick={() => nav(`/calendar/${addDays(date, 1)}`)}>翌日</button>
+          <button className="ghost" onClick={() => nav(`/calendar/${addDays(date, -1)}${ownerSlugParam ? `?owner=${ownerSlugParam}` : ownerId ? `?ownerId=${ownerId}` : ''}`)}>前日</button>
+          <input type="date" value={date} onChange={(e)=> e.target.value && nav(`/calendar/${e.target.value}${ownerSlugParam ? `?owner=${ownerSlugParam}` : ownerId ? `?ownerId=${ownerId}` : ''}`)} />
+          <button className="ghost" onClick={() => nav(`/calendar/${toDateInput(new Date())}${ownerSlugParam ? `?owner=${ownerSlugParam}` : ownerId ? `?ownerId=${ownerId}` : ''}`)}>今日</button>
+          <button className="ghost" onClick={() => nav(`/calendar/${addDays(date, 1)}${ownerSlugParam ? `?owner=${ownerSlugParam}` : ownerId ? `?ownerId=${ownerId}` : ''}`)}>翌日</button>
         </div>
       </section>
       <section className="card" style={{ minHeight: 'var(--daycal-card-min, 420px)' }}>

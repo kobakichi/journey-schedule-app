@@ -6,6 +6,7 @@ import { initTheme } from './theme';
 import App from './App';
 import DayListPage from './pages/DayListPage';
 import DayCalendarPage from './pages/DayCalendarPage';
+import InviteAcceptPage from './pages/InviteAcceptPage';
 
 const today = new Date().toISOString().slice(0,10);
 const router = createBrowserRouter([
@@ -15,6 +16,7 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to={`/calendar/${today}`} replace /> },
       { path: 'day/:date', element: <DayListPage /> },
       { path: 'calendar/:date', element: <DayCalendarPage /> },
+      { path: 'invite/:token', element: <InviteAcceptPage /> },
     ]
   }
 ]);

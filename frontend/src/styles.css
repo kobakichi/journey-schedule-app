@@ -562,6 +562,105 @@ button:active {
   margin: 0 auto 12px;
 }
 
+/* Compact sheet variant (used for ShareManager) */
+.sheet-compact {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+@media (max-width: 640px) {
+  .sheet-compact {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-height: 65vh; /* 上部に余白を確保 */
+    border-radius: 16px; /* 下辺も角丸にする（浮かせるデザイン） */
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  }
+}
+
+/* ShareManager layout helpers */
+.form-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.share-form-grid {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.share-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.share-user-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.share-user-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.invite-form-grid {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.invite-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.invite-item-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.invite-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.copy-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* Mobile adjustments for ShareManager */
+@media (max-width: 640px) {
+  .share-form-grid { grid-template-columns: 1fr; }
+  .share-form-grid button { width: 100%; }
+
+  .share-user-row { grid-template-columns: 1fr; }
+  .share-user-actions { justify-content: flex-end; }
+
+  .invite-form-grid { grid-template-columns: 1fr; }
+  .invite-form-grid button { width: 100%; }
+
+  .invite-item-row { grid-template-columns: 1fr; }
+  .invite-actions { justify-content: flex-end; }
+  .invite-actions button { flex: 1 1 auto; }
+
+  .copy-grid { grid-template-columns: 1fr; }
+  .copy-grid button { width: 100%; }
+}
+
 /* Day calendar (Google Calendar-like) */
 .daycal {
   position: relative;
