@@ -10,7 +10,8 @@ type Props = {
 };
 
 const pxPerMin = 1; // 1分=1px → 24h=1440px
-const SNAP_MIN = 5; // 5分刻み
+const SNAP_MIN = 5; // 5分刻み（マウス等）
+const TOUCH_SNAP_MIN = 5; // スマホでも5分刻みを維持
 const MIN_DURATION_MIN = 15; // 最小15分
 
 function minsFromMidnight(d: Date) {
@@ -92,9 +93,10 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
     const rect = grid.getBoundingClientRect();
     const scrollTop = cont.scrollTop;
     const y = e.clientY - rect.top + scrollTop;
+    const step = ((e as any).pointerType === 'touch') ? TOUCH_SNAP_MIN : SNAP_MIN;
     if(drag){
       const delta = y - (drag.startY - rect.top + scrollTop);
-      let nextTop = Math.round((drag.startTop + delta) / SNAP_MIN) * SNAP_MIN;
+      let nextTop = Math.round((drag.startTop + delta) / step) * step;
       nextTop = Math.max(0, Math.min(1440 - drag.duration, nextTop));
       setOverrides(prev => ({ ...prev, [drag.id]: nextTop }));
       return;
@@ -128,7 +130,7 @@ export default function DayCalendar({ items, date, onChangeTime, onRequestCreate
     }
     if(resize){
       const delta = y - (resize.startY - rect.top + scrollTop);
-      let nextHeight = Math.round((resize.startHeight + delta) / SNAP_MIN) * SNAP_MIN;
+      let nextHeight = Math.round((resize.startHeight + delta) / step) * step;
       nextHeight = Math.max(MIN_DURATION_MIN, Math.min(1440 - resize.top, nextHeight));
       setOverrideHeights(prev => ({ ...prev, [resize.id]: nextHeight }));
       return;

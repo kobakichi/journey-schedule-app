@@ -651,11 +651,11 @@ button:active {
 .daycal-timehint {
   position: absolute;
   top: -16px;
-  right: 8px;
+  left: 8px;
   background: rgba(17,24,39,0.92);
   color: #fff;
   font-weight: 800;
-  font-size: 12px;
+  font-size: 14px;
   padding: 2px 6px;
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
