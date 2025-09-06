@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express, { type Request, type Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import cookieParser from 'cookie-parser';
@@ -10,14 +12,43 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// Security headers
+app.use(helmet({ contentSecurityPolicy: false }));
+
+// CORS (strict): allow specific origins and send credentials (cookies)
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173').split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({ origin: (origin, cb) => {
+  if (!origin) return cb(null, true); // allow non-browser or same-origin
+  cb(null, ALLOWED_ORIGINS.includes(origin));
+}, credentials: true }));
+
+app.use(express.json({ limit: '256kb' }));
 app.use(cookieParser());
+
+// Rate limiting
+const apiLimiter = rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false });
+app.use('/api/', apiLimiter);
+const authLimiter = rateLimit({ windowMs: 5 * 60_000, max: 20, standardHeaders: true, legacyHeaders: false });
+app.use('/api/auth/', authLimiter);
+const inviteLimiter = rateLimit({ windowMs: 10 * 60_000, max: 30, standardHeaders: true, legacyHeaders: false });
+app.use('/api/share/day/invite', inviteLimiter);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+// Enforce secret in production
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'dev-secret') {
+  throw new Error('JWT_SECRET must be set in production');
+}
+
+// Helper: sanitize error message in production
+function errorMessage(e: any, fallback: string = 'bad_request'){
+  const msg = (e && (e.message || e.error)) ? String(e.message || e.error) : fallback;
+  return process.env.NODE_ENV === 'production' ? fallback : msg;
+}
 
 // Health check
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -107,7 +138,7 @@ app.post('/api/auth/google', async (req: Request, res: Response) => {
     res.cookie('session', token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 30*24*60*60*1000 });
     return res.json({ user });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: errorMessage(e) });
   }
 });
 
@@ -158,7 +189,7 @@ app.get('/api/day', ensureAuth, async (req: Request & { user?: ReqUser }, res: R
     const { shares, ...rest } = schedule as any;
     return res.json({ schedule: rest });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: errorMessage(e, 'internal_error') });
   }
 });
 
@@ -167,8 +198,8 @@ app.post('/api/day', ensureAuth, async (req: Request & { user?: ReqUser }, res: 
   try {
     const bodySchema = z.object({
       date: z.string(),
-      title: z.string().optional(),
-      notes: z.string().optional(),
+      title: z.string().max(120).optional(),
+      notes: z.string().max(2000).optional(),
     });
     const body = bodySchema.parse(req.body);
     const date = parseDateOnlyUTC(body.date);
@@ -180,7 +211,7 @@ app.post('/api/day', ensureAuth, async (req: Request & { user?: ReqUser }, res: 
     });
     return res.json({ schedule });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: errorMessage(e) });
   }
 });
 
@@ -189,18 +220,18 @@ app.post('/api/item', ensureAuth, async (req: Request & { user?: ReqUser }, res:
   try {
     const bodySchema = z.object({
       date: z.string(),
-      title: z.string().min(1),
-      emoji: z.string().optional(),
-      color: z.string().optional(),
+      title: z.string().min(1).max(120),
+      emoji: z.string().max(16).optional(),
+      color: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/).optional(),
       startTime: z.string(), // HH:mm
       endTime: z.string().optional(),
-      location: z.string().optional(),
+      location: z.string().max(200).optional(),
       kind: z.enum(['GENERAL','MOVE','general','move']).optional(),
-      departurePlace: z.string().optional(),
-      arrivalPlace: z.string().optional(),
-      notes: z.string().optional(),
+      departurePlace: z.string().max(200).optional(),
+      arrivalPlace: z.string().max(200).optional(),
+      notes: z.string().max(2000).optional(),
       ownerId: z.number().optional(),
-      ownerSlug: z.string().optional(),
+      ownerSlug: z.string().max(64).optional(),
     });
     const body = bodySchema.parse(req.body);
     const date = parseDateOnlyUTC(body.date);
@@ -245,7 +276,7 @@ app.post('/api/item', ensureAuth, async (req: Request & { user?: ReqUser }, res:
     });
     return res.json({ item });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: errorMessage(e) });
   }
 });
 
@@ -255,17 +286,17 @@ app.put('/api/item/:id', ensureAuth, async (req: Request & { user?: ReqUser }, r
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'invalid id' });
     const bodySchema = z.object({
-      title: z.string().min(1).optional(),
-      emoji: z.string().optional(),
-      color: z.string().optional(),
+      title: z.string().min(1).max(120).optional(),
+      emoji: z.string().max(16).optional(),
+      color: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/).optional(),
       startTime: z.string().optional(), // HH:mm
       endTime: z.string().optional(),
       date: z.string().optional(),
-      location: z.string().optional(),
+      location: z.string().max(200).optional(),
       kind: z.enum(['GENERAL','MOVE','general','move']).optional(),
-      departurePlace: z.string().optional(),
-      arrivalPlace: z.string().optional(),
-      notes: z.string().optional(),
+      departurePlace: z.string().max(200).optional(),
+      arrivalPlace: z.string().max(200).optional(),
+      notes: z.string().max(2000).optional(),
     });
     const body = bodySchema.parse(req.body);
     let start: Date | undefined;
@@ -298,7 +329,7 @@ app.put('/api/item/:id', ensureAuth, async (req: Request & { user?: ReqUser }, r
     });
     return res.json({ item });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: errorMessage(e) });
   }
 });
 
@@ -318,7 +349,7 @@ app.delete('/api/item/:id', ensureAuth, async (req: Request & { user?: ReqUser }
     await prisma.scheduleItem.delete({ where: { id } });
     return res.json({ ok: true });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: errorMessage(e) });
   }
 });
 
@@ -338,14 +369,14 @@ app.get('/api/share/day', ensureAuth, async (req: Request & { user?: ReqUser }, 
     });
     return res.json({ shares });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: errorMessage(e) });
   }
 });
 
 // 共有: 指定日の共有追加/更新（オーナー用）
 app.post('/api/share/day', ensureAuth, async (req: Request & { user?: ReqUser }, res: Response) => {
   try {
-    const bodySchema = z.object({ date: z.string(), email: z.string().email(), canEdit: z.boolean().optional() });
+    const bodySchema = z.object({ date: z.string(), email: z.string().email().max(320), canEdit: z.boolean().optional() });
     const body = bodySchema.parse(req.body);
     const date = parseDateOnlyUTC(body.date);
     const ownerId = req.user!.userId;
@@ -364,7 +395,7 @@ app.post('/api/share/day', ensureAuth, async (req: Request & { user?: ReqUser },
     });
     return res.json({ share });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: errorMessage(e) });
   }
 });
 
@@ -380,7 +411,7 @@ app.delete('/api/share/day', ensureAuth, async (req: Request & { user?: ReqUser 
     await prisma.scheduleShare.deleteMany({ where: { scheduleId: schedule.id, sharedWithUserId: q.userId } });
     return res.json({ ok: true });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: errorMessage(e) });
   }
 });
 
@@ -399,14 +430,14 @@ app.get('/api/shared/day/list', ensureAuth, async (req: Request & { user?: ReqUs
     const owners = schedules.map(s => s.user);
     return res.json({ owners });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: errorMessage(e) });
   }
 });
 
 // 招待リンクの作成（オーナー用）
 app.post('/api/share/day/invite', ensureAuth, async (req: Request & { user?: ReqUser }, res: Response) => {
   try {
-    const schema = z.object({ date: z.string(), canEdit: z.boolean().optional(), email: z.string().email().optional(), ttlHours: z.number().int().positive().max(24*90).optional() });
+    const schema = z.object({ date: z.string(), canEdit: z.boolean().optional(), email: z.string().email().max(320).optional(), ttlHours: z.number().int().positive().max(24*90).optional() });
     const body = schema.parse(req.body);
     const date = parseDateOnlyUTC(body.date);
     const ownerId = req.user!.userId;
@@ -416,7 +447,7 @@ app.post('/api/share/day/invite', ensureAuth, async (req: Request & { user?: Req
     const invite = await prisma.scheduleShareInvite.create({ data: { scheduleId: schedule.id, token, invitedEmail: body.email, canEdit: body.canEdit ?? false, expiresAt } });
     return res.json({ invite: { id: invite.id, token: invite.token, canEdit: invite.canEdit, invitedEmail: invite.invitedEmail, expiresAt: invite.expiresAt } });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: errorMessage(e) });
   }
 });
 
@@ -431,7 +462,7 @@ app.get('/api/share/day/invites', ensureAuth, async (req: Request & { user?: Req
     if (!schedule) return res.json({ invites: [] });
     const invites = await prisma.scheduleShareInvite.findMany({ where: { scheduleId: schedule.id }, orderBy: { id: 'desc' }, select: { id: true, token: true, invitedEmail: true, canEdit: true, expiresAt: true, redeemedAt: true, redeemedByUserId: true } });
     return res.json({ invites });
-  } catch (e: any) { return res.status(400).json({ error: e.message }); }
+  } catch (e: any) { return res.status(400).json({ error: errorMessage(e) }); }
 });
 
 // 招待リンクの無効化（オーナー用）
@@ -443,7 +474,7 @@ app.delete('/api/share/day/invite/:id', ensureAuth, async (req: Request & { user
     if (!invite || invite.schedule.userId !== req.user!.userId) return res.status(404).json({ error: 'not found' });
     await prisma.scheduleShareInvite.delete({ where: { id } });
     return res.json({ ok: true });
-  } catch (e: any) { return res.status(400).json({ error: e.message }); }
+  } catch (e: any) { return res.status(400).json({ error: errorMessage(e) }); }
 });
 
 // 招待メタデータ取得（認証不要）
@@ -456,7 +487,7 @@ app.get('/api/share/invite/:token', async (req: Request, res: Response) => {
     const now = new Date();
     const expired = !!(inv.expiresAt && inv.expiresAt < now);
     return res.json({ invite: { token: inv.token, invitedEmail: inv.invitedEmail, canEdit: inv.canEdit, expiresAt: inv.expiresAt, redeemedAt: inv.redeemedAt, owner: inv.schedule.user, date: inv.schedule.date, expired } });
-  } catch (e: any) { return res.status(400).json({ error: e.message }); }
+  } catch (e: any) { return res.status(400).json({ error: errorMessage(e) }); }
 });
 
 // 招待受諾（認証必須）
@@ -488,7 +519,7 @@ app.post('/api/share/invite/:token/accept', ensureAuth, async (req: Request & { 
     // Mark invite as redeemed
     await prisma.scheduleShareInvite.update({ where: { id: inv.id }, data: { redeemedAt: now, redeemedByUserId: me } });
     return res.json({ ok: true, ownerId: inv.schedule.userId, date: inv.schedule.date });
-  } catch (e: any) { return res.status(400).json({ error: e.message }); }
+  } catch (e: any) { return res.status(400).json({ error: errorMessage(e) }); }
 });
 
 app.listen(PORT, () => {
