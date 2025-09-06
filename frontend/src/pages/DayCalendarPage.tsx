@@ -69,7 +69,7 @@ export default function DayCalendarPage(){
           <button className="ghost" onClick={() => nav(`/calendar/${addDays(date, 1)}`)}>翌日</button>
         </div>
       </section>
-      <section className="card" style={{ minHeight: 420 }}>
+      <section className="card" style={{ minHeight: 'var(--daycal-card-min, 420px)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <strong>タイムライン（カレンダー）</strong>
           {loading ? <span className="muted">読み込み中…</span> : error ? <span className="muted">{error}</span> : <span className="muted">{date}</span>}
